@@ -30,16 +30,15 @@ description: 用户可以通过“@提及“通道用户来向数字员工下达
 
 |  角色  |  说明  |
 |  --  |  --  |
-| 管理员 | - 查看、导入、导出通道用户<br>- 配置数字员工消息范围 |
+| 管理员 | - 管理通道用户<br>- 配置数字员工消息范围 |
 | 普通用户 | - 在聊天中通过 @提及 指示数字员工向指定通道发送消息 |
 
 ### 通道用户管理
 
-管理员可以在【系统配置】/【通道用户】界面统一查看和批量维护所有的通道用户账号。【通道用户】功能支持：
+管理员可以在【系统配置】/【通道用户】界面统一管理所有的通道用户账号。【通道用户】功能支持：
 
 - 查看通道用户列表
 - 使用 JSONL 模板导入导出通道用户
-- 不支持在页面中单条新建、编辑、删除通道用户
 
 #### 查看通道用户列表
 
@@ -150,46 +149,13 @@ BE ->> SW: 返回列表数据
 
 - 过滤条件支持传入 `type` 和 `displayName`，根据过滤条件参数进一步筛选过滤列表。
 
-### 通道用户接口范围
-
-通道用户仅提供列表查询、导入和导出接口，不提供单条通道用户的新建、编辑、删除接口。
-
-| 方法 | 路径 | 说明 |
-| -- | -- | -- |
-| GET | `/api/dip-studio/v1/channel-users` | 查询通道用户列表 |
-| GET | `/api/dip-studio/v1/channel-users/export` | 导出通道用户 JSONL 文件 |
-| POST | `/api/dip-studio/v1/channel-users/import` | 导入通道用户 JSONL 文件 |
-
 ### 获取数字员工的 @提及 列表
 
 - 通过 HTTP GET /digital-human/:id/channel-users 获取指定数字员工的可 @提及 列表
 
 ### 投递消息
 
-消息中的内联块，展开为原始数据结构为使用 `@{}` 包含的结构：
-
-```text
-@{channel:<channelType>:displayName:<displayName>:user_id:<userId>}
-```
-
-字段说明：
-
-| 字段 | 说明 |
-| -- | -- |
-| `channelType` | 通道类型，例如 `feishu`、`dingding` |
-| `displayName` | 通道用户显示名 |
-| `userId` | 通道用户在对应通道中的 `user_id` |
-
-解析规则：
-
-1. 仅识别以 `@{channel:` 开始、以 `}` 结束的文本片段。
-2. 在片段中按固定字段标记解析：`channel`、`displayName`、`user_id`。
-3. `channelType` 位于 `@{channel:` 与 `:displayName:` 之间。
-4. `displayName` 位于 `:displayName:` 与结束符 `}` 前最后一个 `:user_id:` 之间。
-5. `userId` 位于结束符 `}` 前最后一个 `:user_id:` 与 `}` 之间。
-6. 解析成功后，前端展示为通道用户内联块；解析失败时，按普通文本展示。
-
-示例：
+消息中的内联块，展开为原始数据结构为使用 “@{}“ 包含的结构：`@{channel:<channelType>:user:<displayName>:<userId>}`，示例：
 
 当用户向数字员工发送指令：
 
@@ -199,10 +165,10 @@ BE ->> SW: 返回列表数据
 
 指令文本需要被解析：
 
-- [飞书用户: Zak] 表示内联的 @提及，底层消息结构为：`@{channel:feishu:displayName:Zak:user_id:feishu_user_id_3}`
+- [飞书用户: Zak] 表示内联的 @提及，底层消息结构为：`@{channel:feishu:user:Zak:feishu_user_id_3}`
 - 转换成 Agent 收到的消息：
   ```text
-  汇总 XX 项目进度，发送项目报告并发送给 @{channel:feishu:displayName:Zak:user_id:feishu_user_id_3}
+  汇总 XX 项目进度，发送项目报告并发送给 @{channel:feishu:user:Zak:feishu_user_id_3}
   ```
 
 Agent 接收到消息后：
