@@ -9,6 +9,8 @@ const CHANNEL_MENTION_USER_ID_MARKER = ':user_id:'
 
 const CHANNEL_TYPE_LABELS: Record<string, string> = {
   feishu: '飞书用户',
+  dingding: '钉钉用户',
+  wecom: '企业微信用户',
 }
 
 export interface ChannelMentionParseResult {
@@ -31,7 +33,13 @@ const escapeHtml = (value: string): string => {
 export const formatChannelMentionLabel = (channelType: string, displayName: string): string => {
   const normalizedChannelType = channelType.trim()
   const typeLabel = CHANNEL_TYPE_LABELS[normalizedChannelType] || `${normalizedChannelType}用户`
-  return `${typeLabel}:${displayName}`
+  return `${typeLabel}：${displayName}`
+}
+
+export const formatChannelTypeLabel = (channelType: string): string => {
+  const normalizedChannelType = channelType.trim()
+  const typeLabel = CHANNEL_TYPE_LABELS[normalizedChannelType] || `${normalizedChannelType}用户`
+  return typeLabel.replace(/用户$/, '')
 }
 
 export const parseChannelMentionAt = (

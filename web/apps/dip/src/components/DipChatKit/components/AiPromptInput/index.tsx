@@ -22,7 +22,9 @@ import intl from 'react-intl-universal'
 import IconFont from '@/components/IconFont'
 import ResizeObserver from '@/components/ResizeObserver'
 import useResizeObserver from '@/hooks/useResizeObserver'
-import { getDigitalHumanList } from '../../apis'
+import { getChannelUserList, getDigitalHumanList } from '../../apis'
+import type { DipChatKitChannelUser } from '../../apis/types'
+import { formatChannelMentionLabel, formatChannelTypeLabel } from '../ChannelMention/utils'
 import styles from './index.module.less'
 import type {
   AiPromptInputProps,
@@ -54,6 +56,10 @@ const mentionAvatarColors = [
 const getInitial = (label: string) => label.trim().charAt(0) || ''
 const uploadValidateMessageKey = 'ai-prompt-upload-validate'
 const employeeSlotKey = 'ai_prompt_input_employee_slot'
+const channelUserPageSize = 200
+const channelUserCollapsedCount = 5
+const channelUserOptionPrefix = 'channel_user'
+const channelGroupActionPrefix = 'channel_group_action'
 const caretPlaceholder = '\u200b'
 
 type SenderSlotItem = NonNullable<SenderProps['slotConfig']>[number]
@@ -74,6 +80,37 @@ const sanitizeEditorValue = (inputValue: string): string => {
   return inputValue.replace(/\u200b/g, '')
 }
 
+const createChannelUserOptionValue = (channelType: string, userId: string): string => {
+  return `${channelUserOptionPrefix}:${channelType}:${userId}`
+}
+
+const createChannelMentionPayload = (option: AiPromptMentionOption): string => {
+  return `@{channel:${option.channelType}:user:${option.displayName}:${option.userId}}`
+}
+
+const getMentionOptionLabel = (option: AiPromptMentionOption): string => {
+  if (option.kind === 'channelUser' && option.channelType && option.displayName) {
+    return formatChannelMentionLabel(option.channelType, option.displayName)
+  }
+  return option.label
+}
+
+const toChannelUserOption = (item: DipChatKitChannelUser): AiPromptMentionOption | null => {
+  const channelType = item.channel?.type?.trim()
+  const userId = item.channel?.user_id?.trim()
+  const displayName = item.displayName?.trim()
+  if (!(channelType && userId && displayName)) return null
+
+  return {
+    kind: 'channelUser',
+    value: createChannelUserOptionValue(channelType, userId),
+    label: displayName,
+    displayName,
+    channelType,
+    userId,
+  }
+}
+
 const AiPromptInput: React.FC<AiPromptInputProps> = ({
   value,
   defaultValue = '',
@@ -87,7 +124,6 @@ const AiPromptInput: React.FC<AiPromptInputProps> = ({
   onEmployeeSelect,
   employeeOptions = [],
   placeholder,
-  employeePanelTitle,
   employeeButtonLabel,
   attachButtonTitle,
   sendButtonTitle,
@@ -117,6 +153,8 @@ const AiPromptInput: React.FC<AiPromptInputProps> = ({
   const [fileColSpan, setFileColSpan] = useState(6)
   const [employees, setEmployees] = useState<AiPromptMentionOption[]>([])
   const [fetchedEmployeeOptions, setFetchedEmployeeOptions] = useState<AiPromptMentionOption[]>([])
+  const [channelUserOptions, setChannelUserOptions] = useState<AiPromptMentionOption[]>([])
+  const [expandedChannelTypes, setExpandedChannelTypes] = useState<string[]>([])
 
   const mergedValue = value ?? innerValue
   const normalizedMergedValue = sanitizeEditorValue(mergedValue)
@@ -124,18 +162,25 @@ const AiPromptInput: React.FC<AiPromptInputProps> = ({
   const canSubmit = !(disabled || loading)
   const normalizedAssignEmployeeValue = assignEmployeeValue?.trim() || ''
   const showEmployeeSelector = !normalizedAssignEmployeeValue
-  const resolvedEmployeePanelTitle =
-    employeePanelTitle ?? intl.get('aiPromptInput.mentionPanelTitle')
   const resolvedEmployeeButtonLabel = employeeButtonLabel ?? intl.get('aiPromptInput.mentionButton')
+  const resolvedMentionButtonLabel = intl
+    .get('aiPromptInput.mentionObjectButton')
+    .d(resolvedEmployeeButtonLabel)
   const resolvedAttachButtonTitle = attachButtonTitle ?? intl.get('aiPromptInput.attach')
   const resolvedSendButtonTitle = sendButtonTitle ?? intl.get('aiPromptInput.send')
   const resolvedStopButtonTitle = intl.get('dipChatKit.stopGenerate').d('鍋滄鐢熸垚')
   const resolvedRemoveFileTitle = intl.get('aiPromptInput.removeFile')
   const resolvedEmployeeOptions = useMemo(() => {
+    const withKind = (options: AiPromptMentionOption[]) =>
+      options.map((item) => ({
+        ...item,
+        kind: item.kind ?? ('employee' as const),
+      }))
+
     if (employeeOptions.length > 0) {
-      return employeeOptions
+      return withKind(employeeOptions)
     }
-    return fetchedEmployeeOptions
+    return withKind(fetchedEmployeeOptions)
   }, [employeeOptions, fetchedEmployeeOptions])
 
   useEffect(() => {
@@ -197,12 +242,12 @@ const AiPromptInput: React.FC<AiPromptInputProps> = ({
       return
     }
 
-    if (!resolvedEmployeeOptions.length) return
+    if (!(defaultEmployeeValue && resolvedEmployeeOptions.length)) return
     setEmployees((prevEmployees) => {
       if (prevEmployees.length > 0) return prevEmployees
-      const defaultEmployee =
-        resolvedEmployeeOptions.find((item) => item.value === defaultEmployeeValue) ??
-        resolvedEmployeeOptions[0]
+      const defaultEmployee = resolvedEmployeeOptions.find(
+        (item) => item.value === defaultEmployeeValue,
+      )
       if (!defaultEmployee) return prevEmployees
       return [defaultEmployee]
     })
@@ -212,20 +257,64 @@ const AiPromptInput: React.FC<AiPromptInputProps> = ({
     return new Map(resolvedEmployeeOptions.map((item) => [item.value, item]))
   }, [resolvedEmployeeOptions])
 
+  const selectedEmployee = employees[0]
+  const selectedEmployeeKey = selectedEmployee?.value ?? ''
+  const channelUserOptionMap = useMemo(() => {
+    return new Map(channelUserOptions.map((item) => [item.value, item]))
+  }, [channelUserOptions])
+  const useMentionSlotMode = showEmployeeSelector || channelUserOptions.length > 0
+
+  const atMentionOptions = useMemo(() => {
+    if (!showEmployeeSelector) {
+      return channelUserOptions
+    }
+    return selectedEmployeeKey ? channelUserOptions : resolvedEmployeeOptions
+  }, [channelUserOptions, resolvedEmployeeOptions, selectedEmployeeKey, showEmployeeSelector])
+
+  useEffect(() => {
+    let disposed = false
+
+    const loadChannelUsers = async () => {
+      try {
+        const params = { start: 0, limit: channelUserPageSize }
+        const result = await getChannelUserList(params)
+
+        if (disposed) return
+
+        const options = (result.items ?? [])
+          .map(toChannelUserOption)
+          .filter((item): item is AiPromptMentionOption => Boolean(item))
+        setChannelUserOptions(options)
+      } catch {
+        if (disposed) return
+        setChannelUserOptions([])
+        message.error(
+          intl.get('dipChatKit.fetchChannelUserListFailed').d('获取通道用户列表失败，请稍后重试'),
+        )
+      }
+    }
+
+    void loadChannelUsers()
+
+    return () => {
+      disposed = true
+    }
+  }, [])
+
   const keyboardTriggerItems = useMemo(() => {
     const items = Array.isArray(triggerCharacter)
       ? triggerCharacter.filter((item) => item.character)
       : []
 
-    if (showEmployeeSelector) {
+    if (showEmployeeSelector || channelUserOptions.length > 0) {
       items.push({
         character: '@',
-        options: resolvedEmployeeOptions,
+        options: atMentionOptions,
       })
     }
 
     return items
-  }, [resolvedEmployeeOptions, showEmployeeSelector, triggerCharacter])
+  }, [atMentionOptions, channelUserOptions.length, showEmployeeSelector, triggerCharacter])
 
   const keyboardTriggerCharacters = useMemo(() => {
     return keyboardTriggerItems.map((item) => item.character)
@@ -249,49 +338,109 @@ const AiPromptInput: React.FC<AiPromptInputProps> = ({
     return filterMentionOptionsByQuery(keyboardMentionBaseOptions, mentionQuery)
   }, [keyboardMentionBaseOptions, mentionQuery])
 
-  const keyboardMentionOptionMap = useMemo(() => {
-    return new Map(keyboardMentionOptions.map((item) => [item.value, item]))
-  }, [keyboardMentionOptions])
+  const createSwitchableMentionSlotItem = useCallback(
+    (item: AiPromptMentionOption): SenderSlotItem => {
+      const isChannelUser = item.kind === 'channelUser'
+      const slotKey = isChannelUser ? `mention_${item.value}_${Date.now()}` : employeeSlotKey
+      const optionMap = isChannelUser ? channelUserOptionMap : buttonMentionOptionMap
+      const menuOptions = isChannelUser ? channelUserOptions : resolvedEmployeeOptions
+      const color = mentionAvatarColors[0]
 
-  const selectedEmployee = employees[0]
-  const selectedEmployeeKey = selectedEmployee?.value ?? ''
+      return {
+        type: 'custom',
+        key: slotKey,
+        props: {
+          defaultValue: item.value,
+          employeeValue: isChannelUser ? undefined : item.value,
+          mentionKind: item.kind ?? 'employee',
+        },
+        formatResult: (slotValue) => {
+          const valueKey = String(slotValue || item.value)
+          const currentOption = optionMap.get(valueKey) ?? item
+          if (currentOption.kind === 'channelUser') {
+            return createChannelMentionPayload(currentOption)
+          }
+          return ''
+        },
+        customRender: (slotValue, onSlotChange) => {
+          const valueKey = String(slotValue || item.value)
+          const currentOption = optionMap.get(valueKey) ?? item
+          const label = getMentionOptionLabel(currentOption)
+          const menu: MenuProps = {
+            items: menuOptions.map((option, index) => buildSuggestionOptionItem(option, index)),
+            selectable: true,
+            selectedKeys: [currentOption.value],
+            onClick: ({ key, domEvent }) => {
+              domEvent.preventDefault()
+              domEvent.stopPropagation()
+              const nextOption = menuOptions.find((option) => option.value === String(key))
+              if (!nextOption) return
 
-  const createEmployeeSlotItem = useCallback((item: AiPromptMentionOption): SenderSlotItem => {
-    const color = mentionAvatarColors[0]
-    return {
-      type: 'custom',
-      key: employeeSlotKey,
-      props: {
-        defaultValue: item.value,
-        employeeValue: item.value,
-      },
-      formatResult: () => '',
-      customRender: () => {
-        return (
-          <Tag className={styles.employeeSlotTag}>
-            <span className={styles.employeeSlotTagContent}>
-              <span className={styles.employeeSlotTagAvatar}>
-                {item.avatar ?? (
-                  <Avatar
-                    size={18}
-                    style={{
-                      backgroundColor: color.bg,
-                      color: color.fg,
-                      fontSize: 11,
-                      flexShrink: 0,
-                    }}
-                  >
-                    {getInitial(item.label)}
-                  </Avatar>
-                )}
+              if (isChannelUser) {
+                onSlotChange(nextOption.value)
+                return
+              }
+
+              onEmployeeSelect?.(nextOption)
+              setEmployees([nextOption])
+            },
+          }
+
+          const tag = (
+            <Tag
+              className={clsx(styles.employeeSlotTag, styles.switchableMentionTag)}
+              onMouseDown={(event) => {
+                event.preventDefault()
+              }}
+            >
+              <span className={styles.employeeSlotTagContent}>
+                <span className={styles.employeeSlotTagAvatar}>
+                  {currentOption.avatar ?? (
+                    <Avatar
+                      size={18}
+                      style={{
+                        backgroundColor: color.bg,
+                        color: color.fg,
+                        fontSize: 11,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {getInitial(currentOption.displayName ?? currentOption.label)}
+                    </Avatar>
+                  )}
+                </span>
+                <span className={styles.employeeSlotTagLabel}>{label}</span>
               </span>
-              <span className={styles.employeeSlotTagLabel}>{item.label}</span>
-            </span>
-          </Tag>
-        )
-      },
-    }
-  }, [])
+            </Tag>
+          )
+
+          if (!canEdit || menuOptions.length <= 1) {
+            return tag
+          }
+
+          return (
+            <Dropdown
+              trigger={['click']}
+              placement="bottomLeft"
+              destroyOnHidden
+              menu={menu}
+              popupRender={renderMentionPopup}
+            >
+              {tag}
+            </Dropdown>
+          )
+        },
+      }
+    },
+    [
+      buttonMentionOptionMap,
+      canEdit,
+      channelUserOptionMap,
+      channelUserOptions,
+      onEmployeeSelect,
+      resolvedEmployeeOptions,
+    ],
+  )
 
   const rebuildSenderContent = useCallback(
     (nextContent: string, nextEmployee?: AiPromptMentionOption) => {
@@ -302,7 +451,7 @@ const AiPromptInput: React.FC<AiPromptInputProps> = ({
 
       const insertItems: SenderSlotItem[] = []
       if (showEmployeeSelector && nextEmployee) {
-        insertItems.push(createEmployeeSlotItem(nextEmployee))
+        insertItems.push(createSwitchableMentionSlotItem(nextEmployee))
       }
       if (nextContent) {
         insertItems.push({
@@ -325,52 +474,131 @@ const AiPromptInput: React.FC<AiPromptInputProps> = ({
         isRebuildingContentRef.current = false
       })
     },
-    [createEmployeeSlotItem, showEmployeeSelector],
+    [createSwitchableMentionSlotItem, showEmployeeSelector],
   )
+
+  function buildSuggestionOptionItem(
+    item: AiPromptMentionOption,
+    index: number,
+  ): NonNullable<MenuProps['items']>[number] {
+    const color = mentionAvatarColors[index % mentionAvatarColors.length]
+    const label = getMentionOptionLabel(item)
+    return {
+      key: item.value,
+      label: (
+        <span className={styles.mentionMenuItem}>
+          <span className={styles.mentionIcon}>
+            {item.avatar ?? (
+              <Avatar
+                size={24}
+                style={{
+                  backgroundColor: color.bg,
+                  color: color.fg,
+                  fontSize: 12,
+                  flexShrink: 0,
+                }}
+              >
+                {getInitial(item.displayName ?? item.label)}
+              </Avatar>
+            )}
+          </span>
+          <Tooltip title={label} placement="right">
+            <span className={styles.mentionMenuLabel}>{label}</span>
+          </Tooltip>
+        </span>
+      ),
+    }
+  }
+
+  const groupChannelOptions = (options: AiPromptMentionOption[]) => {
+    const groups = new Map<string, AiPromptMentionOption[]>()
+    for (const option of options) {
+      if (option.kind !== 'channelUser' || !option.channelType) continue
+      const current = groups.get(option.channelType) ?? []
+      current.push(option)
+      groups.set(option.channelType, current)
+    }
+    return Array.from(groups.entries()).sort(([left], [right]) => left.localeCompare(right))
+  }
+
+  const getVisibleMentionOptions = (options: AiPromptMentionOption[]): AiPromptMentionOption[] => {
+    const employeeOptions = options.filter((item) => item.kind !== 'channelUser')
+    const visibleChannelOptions = groupChannelOptions(options).flatMap(([channelType, items]) => {
+      if (expandedChannelTypes.includes(channelType) || items.length <= channelUserCollapsedCount) {
+        return items
+      }
+      return items.slice(0, channelUserCollapsedCount)
+    })
+    return [...employeeOptions, ...visibleChannelOptions]
+  }
 
   const buildSuggestionItems = (
     options: AiPromptMentionOption[],
   ): NonNullable<MenuProps['items']> => {
-    return options.map((item, index) => {
-      const color = mentionAvatarColors[index % mentionAvatarColors.length]
-      return {
-        key: item.value,
-        label: (
-          <span className={styles.mentionMenuItem}>
-            <span className={styles.mentionIcon}>
-              {item.avatar ?? (
-                <Avatar
-                  size={24}
-                  style={{
-                    backgroundColor: color.bg,
-                    color: color.fg,
-                    fontSize: 12,
-                    flexShrink: 0,
-                  }}
-                >
-                  {getInitial(item.label)}
-                </Avatar>
-              )}
+    const items: NonNullable<MenuProps['items']> = []
+    const employeeOptions = options.filter((item) => item.kind !== 'channelUser')
+
+    if (employeeOptions.length > 0) {
+      items.push({
+        type: 'group',
+        key: 'mention_group_employee',
+        label: intl.get('aiPromptInput.employeeMentionGroup').d('我的数字员工'),
+        children: employeeOptions.map((item, index) => buildSuggestionOptionItem(item, index)),
+      })
+    }
+
+    groupChannelOptions(options).forEach(([channelType, groupOptions], groupIndex) => {
+      const expanded = expandedChannelTypes.includes(channelType)
+      const visibleOptions =
+        expanded || groupOptions.length <= channelUserCollapsedCount
+          ? groupOptions
+          : groupOptions.slice(0, channelUserCollapsedCount)
+      const children: NonNullable<MenuProps['items']> = visibleOptions.map((item, index) =>
+        buildSuggestionOptionItem(item, employeeOptions.length + groupIndex + index),
+      )
+
+      if (groupOptions.length > channelUserCollapsedCount) {
+        children.push({
+          key: `${channelGroupActionPrefix}:${channelType}`,
+          label: (
+            <span className={styles.mentionMoreAction}>
+              {expanded
+                ? intl.get('aiPromptInput.collapseMentionGroup').d('收起')
+                : intl.get('aiPromptInput.expandMentionGroup').d('查看更多')}
             </span>
-            <Tooltip title={item.label} placement="right">
-              <span className={styles.mentionMenuLabel}>{item.label}</span>
-            </Tooltip>
-          </span>
-        ),
+          ),
+        })
       }
+
+      items.push({
+        type: 'group',
+        key: `mention_group_channel_${channelType}`,
+        label: formatChannelTypeLabel(channelType),
+        children,
+      })
     })
+
+    return items
   }
 
   const buttonSuggestionItems = useMemo(() => {
-    return buildSuggestionItems(resolvedEmployeeOptions)
-  }, [resolvedEmployeeOptions])
+    return buildSuggestionItems(atMentionOptions)
+  }, [atMentionOptions, expandedChannelTypes])
 
-  const keyboardActiveOption = keyboardMentionOptions[keyboardActiveIndex]
+  const visibleKeyboardMentionOptions = useMemo(() => {
+    return getVisibleMentionOptions(keyboardMentionOptions)
+  }, [expandedChannelTypes, keyboardMentionOptions])
+
+  const keyboardActiveOption = visibleKeyboardMentionOptions[keyboardActiveIndex]
   const keyboardActiveKey = keyboardActiveOption?.value
+
+  const keyboardMentionOptionMap = useMemo(() => {
+    return new Map(visibleKeyboardMentionOptions.map((item) => [item.value, item]))
+  }, [visibleKeyboardMentionOptions])
 
   const keyboardSuggestionItems = useMemo(() => {
     return buildSuggestionItems(keyboardMentionOptions)
-  }, [keyboardMentionOptions])
+  }, [expandedChannelTypes, keyboardMentionOptions])
 
   const clearAnchorRaf = () => {
     if (rafRef.current !== null) {
@@ -423,7 +651,7 @@ const AiPromptInput: React.FC<AiPromptInputProps> = ({
   }
 
   const openMentionPanel = () => {
-    if (!(canEdit && showEmployeeSelector)) return
+    if (!canEdit) return
     if (!buttonSuggestionItems.length) return
     captureCaretSnapshot()
     clearKeyboardOpenRaf()
@@ -539,6 +767,43 @@ const AiPromptInput: React.FC<AiPromptInputProps> = ({
         selection.addRange(snapshot.range)
       }
     })
+  }
+
+  const restoreCaretSnapshotImmediately = () => {
+    const snapshot = caretSnapshotRef.current
+    const inputElement = senderRef.current?.inputElement
+    if (!(snapshot && inputElement instanceof HTMLElement)) return false
+
+    senderRef.current?.focus?.()
+
+    if (snapshot.type === 'textarea' && inputElement instanceof HTMLTextAreaElement) {
+      const textLength = inputElement.value.length
+      const start = Math.min(snapshot.start, textLength)
+      const end = Math.min(snapshot.end, textLength)
+      inputElement.setSelectionRange(start, end)
+      return true
+    }
+
+    if (snapshot.type === 'contentEditable') {
+      if (
+        !(
+          snapshot.range.startContainer.isConnected &&
+          snapshot.range.endContainer.isConnected &&
+          inputElement.contains(snapshot.range.startContainer) &&
+          inputElement.contains(snapshot.range.endContainer)
+        )
+      ) {
+        return false
+      }
+
+      const selection = window.getSelection()
+      if (!selection) return false
+      selection.removeAllRanges()
+      selection.addRange(snapshot.range)
+      return true
+    }
+
+    return false
   }
 
   const normalizeCaretAfterEmployeeSlot = () => {
@@ -714,25 +979,17 @@ const AiPromptInput: React.FC<AiPromptInputProps> = ({
   const handleMentionSelect = (option: AiPromptMentionOption, source: 'button' | 'keyboard') => {
     if (!canEdit) return
 
-    const isEmployeeSelection = buttonMentionOptionMap.has(option.value)
+    const isEmployeeSelection =
+      option.kind !== 'channelUser' && buttonMentionOptionMap.has(option.value)
 
     if (!isEmployeeSelection) {
       const mentionCharacter = activeKeyboardCharacter ?? '@'
-      senderRef.current?.insert?.(
-        [
-          {
-            type: 'tag',
-            key: `mention_${option.value}_${Date.now()}`,
-            props: {
-              label: `${mentionCharacter}${option.label}`,
-              value: option.value,
-            },
-            formatResult: (text) => `${mentionCharacter}${text}`,
-          },
-        ],
-        'cursor',
-        `${mentionCharacter}${mentionQuery}`,
-      )
+      const replaceText = source === 'keyboard' ? `${mentionCharacter}${mentionQuery}` : undefined
+      if (replaceText) {
+        restoreCaretSnapshotImmediately()
+      }
+      senderRef.current?.insert?.([createSwitchableMentionSlotItem(option)], 'cursor', replaceText)
+      caretSnapshotRef.current = null
       closeMentionPanel()
       senderRef.current?.focus?.()
       return
@@ -768,6 +1025,16 @@ const AiPromptInput: React.FC<AiPromptInputProps> = ({
 
   const handleButtonMentionMenuClick: MenuProps['onClick'] = ({ key }) => {
     const clickedKey = String(key)
+    if (clickedKey.startsWith(`${channelGroupActionPrefix}:`)) {
+      const channelType = clickedKey.slice(channelGroupActionPrefix.length + 1)
+      setExpandedChannelTypes((prev) =>
+        prev.includes(channelType)
+          ? prev.filter((item) => item !== channelType)
+          : [...prev, channelType],
+      )
+      return
+    }
+
     if (clickedKey === selectedEmployeeKey) {
       closeMentionPanel()
       restoreCaretSnapshot()
@@ -775,13 +1042,23 @@ const AiPromptInput: React.FC<AiPromptInputProps> = ({
       return
     }
 
-    const option = buttonMentionOptionMap.get(clickedKey)
+    const option = atMentionOptions.find((item) => item.value === clickedKey)
     if (!option) return
     handleMentionSelect(option, 'button')
   }
 
   const handleKeyboardMentionMenuClick: MenuProps['onClick'] = ({ key }) => {
     const clickedKey = String(key)
+    if (clickedKey.startsWith(`${channelGroupActionPrefix}:`)) {
+      const channelType = clickedKey.slice(channelGroupActionPrefix.length + 1)
+      setExpandedChannelTypes((prev) =>
+        prev.includes(channelType)
+          ? prev.filter((item) => item !== channelType)
+          : [...prev, channelType],
+      )
+      return
+    }
+
     const isKeyboardEmployeeMenu = showEmployeeSelector && activeKeyboardCharacter === '@'
     if (isKeyboardEmployeeMenu && clickedKey === selectedEmployeeKey) {
       closeMentionPanel()
@@ -796,7 +1073,7 @@ const AiPromptInput: React.FC<AiPromptInputProps> = ({
   }
 
   const handleButtonDropdownOpenChange = (nextOpen: boolean) => {
-    if (!(showEmployeeSelector && canEdit && buttonSuggestionItems.length)) {
+    if (!(canEdit && buttonSuggestionItems.length)) {
       closeMentionPanel()
       return
     }
@@ -886,25 +1163,18 @@ const AiPromptInput: React.FC<AiPromptInputProps> = ({
   })
 
   useEffect(() => {
-    if (!keyboardMentionOpen) return
-    if (!keyboardSuggestionItems.length) {
-      closeKeyboardMentionPanel()
-    }
-  }, [keyboardMentionOpen, keyboardSuggestionItems.length])
-
-  useEffect(() => {
     if (!keyboardMentionOpen) {
       setKeyboardActiveIndex(-1)
       return
     }
 
-    if (!keyboardMentionOptions.length) {
+    if (!visibleKeyboardMentionOptions.length) {
       setKeyboardActiveIndex(-1)
       return
     }
 
     if (showEmployeeSelector && activeKeyboardCharacter === '@' && selectedEmployeeKey) {
-      const selectedIndex = keyboardMentionOptions.findIndex(
+      const selectedIndex = visibleKeyboardMentionOptions.findIndex(
         (item) => item.value === selectedEmployeeKey,
       )
       if (selectedIndex >= 0) {
@@ -917,9 +1187,9 @@ const AiPromptInput: React.FC<AiPromptInputProps> = ({
   }, [
     activeKeyboardCharacter,
     keyboardMentionOpen,
-    keyboardMentionOptions,
     selectedEmployeeKey,
     showEmployeeSelector,
+    visibleKeyboardMentionOptions,
   ])
 
   useEffect(() => {
@@ -927,11 +1197,6 @@ const AiPromptInput: React.FC<AiPromptInputProps> = ({
       closeKeyboardMentionPanel()
     }
   }, [keyboardMentionOpen, keyboardTriggerCharacters.length])
-
-  useEffect(() => {
-    if (showEmployeeSelector || !(buttonMentionOpen || keyboardMentionOpen)) return
-    closeMentionPanel()
-  }, [buttonMentionOpen, keyboardMentionOpen, showEmployeeSelector])
 
   useEffect(() => {
     if (!showEmployeeSelector) return
@@ -988,14 +1253,26 @@ const AiPromptInput: React.FC<AiPromptInputProps> = ({
   }
 
   const renderMentionPopup = (menuNode: React.ReactNode) => {
+    const isKeyboardPopup = keyboardMentionOpen || keyboardOpenRafRef.current !== null
+    const hasOptions = isKeyboardPopup
+      ? keyboardSuggestionItems.length > 0
+      : buttonMentionOpen
+        ? buttonSuggestionItems.length > 0
+        : true
+
     return (
       <div
         className={styles.mentionDropdown}
         onMouseDownCapture={markMentionMenuMouseDown}
         onMouseUpCapture={clearMentionMenuMouseDown}
       >
-        <div className={styles.mentionTitle}>{resolvedEmployeePanelTitle}</div>
-        {menuNode}
+        {hasOptions ? (
+          menuNode
+        ) : (
+          <div className={styles.mentionEmpty}>
+            {intl.get('aiPromptInput.emptyMentionContacts').d('无匹配的联系人')}
+          </div>
+        )}
       </div>
     )
   }
@@ -1008,7 +1285,7 @@ const AiPromptInput: React.FC<AiPromptInputProps> = ({
   }
 
   const keyboardSelectedKeys = (() => {
-    if (!(showEmployeeSelector && activeKeyboardCharacter === '@')) {
+    if (activeKeyboardCharacter !== '@') {
       return []
     }
 
@@ -1016,7 +1293,7 @@ const AiPromptInput: React.FC<AiPromptInputProps> = ({
       return [keyboardActiveKey]
     }
 
-    if (selectedEmployeeKey) {
+    if (showEmployeeSelector && selectedEmployeeKey) {
       return [selectedEmployeeKey]
     }
 
@@ -1084,7 +1361,8 @@ const AiPromptInput: React.FC<AiPromptInputProps> = ({
   )
 
   const isButtonMentionOpen = buttonMentionOpen && buttonSuggestionItems.length > 0
-  const isKeyboardMentionOpen = keyboardMentionOpen && keyboardSuggestionItems.length > 0
+  const isKeyboardMentionOpen =
+    keyboardMentionOpen && activeKeyboardCharacter === '@' && keyboardMentionBaseOptions.length > 0
 
   return (
     <div className={clsx('AiPromptInput', styles.root, className)}>
@@ -1110,7 +1388,7 @@ const AiPromptInput: React.FC<AiPromptInputProps> = ({
         <Sender
           ref={senderRef}
           value={mergedValue}
-          slotConfig={showEmployeeSelector ? emptySenderSlotConfig : undefined}
+          slotConfig={useMentionSlotMode ? emptySenderSlotConfig : undefined}
           loading={loading}
           disabled={!canEdit}
           placeholder={placeholder}
@@ -1172,7 +1450,7 @@ const AiPromptInput: React.FC<AiPromptInputProps> = ({
             }
 
             const triggerOptions = keyboardTriggerOptionMap.get(triggerMatch.character) ?? []
-            if (!triggerOptions.length) {
+            if (!(triggerOptions.length || triggerMatch.character === '@')) {
               closeKeyboardMentionPanel()
               return
             }
@@ -1214,9 +1492,8 @@ const AiPromptInput: React.FC<AiPromptInputProps> = ({
 
             const isKeyboardEmployeeMenuOpen =
               keyboardMentionOpen &&
-              showEmployeeSelector &&
               activeKeyboardCharacter === '@' &&
-              keyboardMentionOptions.length > 0
+              visibleKeyboardMentionOptions.length > 0
             const isComposing = Boolean(event.nativeEvent.isComposing)
 
             if (isKeyboardEmployeeMenuOpen) {
@@ -1224,7 +1501,7 @@ const AiPromptInput: React.FC<AiPromptInputProps> = ({
                 event.preventDefault()
                 setKeyboardActiveIndex((prev) => {
                   const current = prev >= 0 ? prev : -1
-                  return (current + 1) % keyboardMentionOptions.length
+                  return (current + 1) % visibleKeyboardMentionOptions.length
                 })
                 return
               }
@@ -1234,7 +1511,8 @@ const AiPromptInput: React.FC<AiPromptInputProps> = ({
                 setKeyboardActiveIndex((prev) => {
                   const current = prev >= 0 ? prev : 0
                   return (
-                    (current - 1 + keyboardMentionOptions.length) % keyboardMentionOptions.length
+                    (current - 1 + visibleKeyboardMentionOptions.length) %
+                    visibleKeyboardMentionOptions.length
                   )
                 })
                 return
@@ -1243,7 +1521,7 @@ const AiPromptInput: React.FC<AiPromptInputProps> = ({
               if (event.key === 'Enter' && !isComposing) {
                 suppressSubmitForCurrentFrame()
                 const normalizedIndex = keyboardActiveIndex >= 0 ? keyboardActiveIndex : 0
-                const activeOption = keyboardMentionOptions[normalizedIndex]
+                const activeOption = visibleKeyboardMentionOptions[normalizedIndex]
                 if (!activeOption) return
 
                 if (activeOption.value === selectedEmployeeKey) {
@@ -1274,7 +1552,7 @@ const AiPromptInput: React.FC<AiPromptInputProps> = ({
             return (
               <Flex align="center" justify="space-between" className={styles.footer}>
                 <Flex align="center" className={styles.leftActions}>
-                  {showEmployeeSelector && (
+                  {(showEmployeeSelector || channelUserOptions.length > 0) && (
                     <Dropdown
                       trigger={['click']}
                       placement="topLeft"
@@ -1284,11 +1562,11 @@ const AiPromptInput: React.FC<AiPromptInputProps> = ({
                       menu={buttonMentionMenu}
                       popupRender={renderMentionPopup}
                     >
-                      <Tooltip title={resolvedEmployeeButtonLabel}>
+                      <Tooltip title={resolvedMentionButtonLabel}>
                         <span>
                           <Button
                             type="text"
-                            aria-label={resolvedEmployeeButtonLabel}
+                            aria-label={resolvedMentionButtonLabel}
                             disabled={!(canEdit && buttonSuggestionItems.length)}
                             onMouseDownCapture={captureCaretSnapshot}
                             onClick={openMentionPanel}

@@ -64,6 +64,32 @@ export interface DipChatKitDigitalHumanDetail {
   icon_id?: string
 }
 
+export type DipChatKitChannelUserType = 'feishu' | 'dingding' | string
+
+export interface DipChatKitChannelUserChannel {
+  type: DipChatKitChannelUserType
+  user_id: string
+}
+
+export interface DipChatKitChannelUser {
+  displayName: string
+  channel: DipChatKitChannelUserChannel
+}
+
+export interface DipChatKitChannelUserListParams {
+  type?: string
+  displayName?: string
+  start?: number
+  limit?: number
+}
+
+export interface DipChatKitChannelUserListResponse {
+  items: DipChatKitChannelUser[]
+  total: number
+  start: number
+  limit: number
+}
+
 export interface DipChatKitResponseSSEOptions {
   sessionKey: string
   signal?: AbortSignal

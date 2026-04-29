@@ -1,6 +1,8 @@
 import intl from 'react-intl-universal'
 import { get, getCommonHttpHeaders, post } from '@/utils/http'
 import type {
+  DipChatKitChannelUserListParams,
+  DipChatKitChannelUserListResponse,
   DipChatKitCreateSessionKeyRequest,
   DipChatKitCreateSessionKeyResponse,
   DipChatKitDigitalHumanDetail,
@@ -50,6 +52,13 @@ export const getDigitalHumanList = (): Promise<DipChatKitDigitalHumanList> => {
 
 export const getDigitalHumanDetail = (id: string): Promise<DipChatKitDigitalHumanDetail> =>
   get(`${BASE}/digital-human/${encodeURIComponent(id)}`) as Promise<DipChatKitDigitalHumanDetail>
+
+export const getChannelUserList = (
+  params?: DipChatKitChannelUserListParams,
+): Promise<DipChatKitChannelUserListResponse> =>
+  get(`${BASE}/channel-users`, {
+    params: cleanParams(params as Record<string, unknown> | undefined),
+  }) as Promise<DipChatKitChannelUserListResponse>
 
 export const getDigitalHumanSessionMessages = (
   sessionId: string,

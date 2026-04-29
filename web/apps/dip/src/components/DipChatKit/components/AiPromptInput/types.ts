@@ -6,6 +6,10 @@ export interface AiPromptMentionOption {
   label: string
   description?: string
   avatar?: ReactNode
+  kind?: 'employee' | 'channelUser'
+  channelType?: string
+  userId?: string
+  displayName?: string
 }
 
 export interface TriggerCharacterItem {

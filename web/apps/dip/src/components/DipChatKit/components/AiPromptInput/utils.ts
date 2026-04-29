@@ -287,7 +287,10 @@ export const filterMentionOptionsByQuery = (
   const normalizedQuery = query.toLocaleLowerCase()
 
   return options.filter((item) => {
-    return item.label.toLocaleLowerCase().includes(normalizedQuery)
+    return (
+      item.label.toLocaleLowerCase().includes(normalizedQuery) ||
+      item.displayName?.toLocaleLowerCase().includes(normalizedQuery)
+    )
   })
 }
 
