@@ -589,11 +589,36 @@ export function buildFirstTurnSessionLabel(
   message: string,
   suffixSource: string = randomUUID()
 ): string {
-  const normalizedMessage = message.replace(/\s+/g, " ").trim();
+  const normalizedMessage = replaceChannelUserMentionsWithDisplayNames(message)
+    .replace(/\s+/g, " ")
+    .trim();
   const suffix = suffixSource.replace(/[^0-9a-zA-Z]/g, "").slice(0, 8);
   const prefix = buildSessionLabelPrefix(normalizedMessage);
 
   return `${prefix}${SESSION_LABEL_SUFFIX_SEPARATOR}${suffix}`;
+}
+
+/**
+ * Replaces OpenClaw channel-user mention tokens with their display names.
+ *
+ * Mention format: `@{channel:<channelType>:user:<displayName>:<userId>}`.
+ *
+ * @param message The raw message that may contain channel-user mention tokens.
+ * @returns Message text with recognized mention tokens replaced by display names.
+ */
+export function replaceChannelUserMentionsWithDisplayNames(message: string): string {
+  return message.replace(
+    /@\{channel:([^}:]+):user:([^}]+)\}/g,
+    (token, _channelType, userPart) => {
+      const lastSeparatorIndex = userPart.lastIndexOf(":");
+
+      if (lastSeparatorIndex <= 0 || lastSeparatorIndex === userPart.length - 1) {
+        return token;
+      }
+
+      return userPart.slice(0, lastSeparatorIndex);
+    }
+  );
 }
 
 /**

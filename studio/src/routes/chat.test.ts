@@ -22,6 +22,7 @@ import {
   readOptionalHeaderValue,
   readRequiredSessionKeyHeader,
   readRequiredUserIdHeader,
+  replaceChannelUserMentionsWithDisplayNames,
   resolveChatAgentSessionLabel,
   writeEventStreamHeaders
 } from "./chat";
@@ -287,6 +288,23 @@ describe("chat agent session labels", () => {
 
   it("falls back to truncating the first sentence when it exceeds the limit", () => {
     expect(buildSessionLabelPrefix("a".repeat(80))).toBe("a".repeat(55));
+  });
+
+  it("uses channel-user mention display names before applying label length rules", () => {
+    expect(
+      buildFirstTurnSessionLabel(
+        "请帮 @{channel:feishu:user:张三:u-1} 和 @{channel:dingtalk:user:李四:u-2} 总结进度",
+        "3f9c2b6a-xxxx"
+      )
+    ).toBe("请帮 张三 和 李四 总结进度_3f9c2b6a");
+  });
+
+  it("extracts display names from each channel-user mention token", () => {
+    expect(
+      replaceChannelUserMentionsWithDisplayNames(
+        "提醒 @{channel:feishu:user:Alice:ou_1}、@{channel:dingtalk:user:Bob:dt_2} 跟进"
+      )
+    ).toBe("提醒 Alice、Bob 跟进");
   });
 
   it("treats a missing session as the first turn", async () => {
