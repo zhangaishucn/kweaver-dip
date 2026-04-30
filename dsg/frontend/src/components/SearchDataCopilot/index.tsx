@@ -137,7 +137,7 @@ const SearchDataCopilot: React.FC = () => {
         }
     }, [visible])
 
-    const baseUrl = `${window.location.origin}/api/agent-app/v1`
+    const baseUrl = `${window.location.origin}/api/agent-factory/v1`
 
     const handleToggle = () => {
         setVisible(!visible)

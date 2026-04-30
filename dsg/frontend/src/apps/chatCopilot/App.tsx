@@ -39,7 +39,7 @@ interface PluginMessage {
 
 const DEFAULT_CONFIG: ChatCopilotConfig = {
     title: 'Data Agent Copilot',
-    baseUrl: `${window.location.origin}/api/agent-app/v1`,
+    baseUrl: `${window.location.origin}/api/agent-factory/v1`,
     agentKey: '',
     businessDomain: 'bd_public',
     useInternalToken: true,

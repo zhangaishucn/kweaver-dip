@@ -53,7 +53,7 @@ const ChatKit = () => {
         console.log('initialQuestion', initialQuestion)
     }, [initialQuestion])
 
-    const baseUrl = `${window.location.origin}/api/agent-app/v1`
+    const baseUrl = `${window.location.origin}/api/agent-factory/v1`
     console.log('baseUrl', baseUrl)
 
     // 判断是否需要等�?token

@@ -386,7 +386,7 @@ export const getAgentAppConversations = (
     app_key: string,
     params?: { page?: number; size?: number },
 ): Promise<IAgentAppConversationList> => {
-    return get(`/api/agent-app/v1/app/${app_key}/conversation`, params)
+    return get(`/api/agent-factory/v1/app/${app_key}/conversation`, params)
 }
 
 /**
@@ -398,7 +398,7 @@ export const deleteAgentAppConversation = (
     app_key: string,
     id: string,
 ): Promise<any> => {
-    return del(`/api/agent-app/v1/app/${app_key}/conversation/${id}`)
+    return del(`/api/agent-factory/v1/app/${app_key}/conversation/${id}`)
 }
 
 /**

@@ -146,7 +146,7 @@ interface AgentInfo {
 {
     title: '数据搜索助手',                    // 组件标题
     visible: true,                           // 始终显示（由 Drawer 控制显示/隐藏）
-    baseUrl: `${window.location.origin}/api/agent-app/v1`,  // API 基础路径
+    baseUrl: `${window.location.origin}/api/agent-factory/v1`,  // API 基础路径
     agentKey: agentInfo.adp_agent_key,      // Agent Key
     token: assistantToken,                  // 访问 Token
     refreshToken: assistantRefreshToken,    // Token 刷新函数
