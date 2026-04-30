@@ -11,11 +11,6 @@ COPY . .
 RUN test -d extensions/dip \
   || (echo "ERROR: extensions/dip is missing. From monorepo root: mkdir -p studio/extensions && cp -R deploy/openclaw-extensions/dip studio/extensions/dip" >&2; exit 1)
 
-# Bundled OpenClaw plugin: copy deploy/openclaw-extensions/larksuite-openclaw-lark-2026.3.24.tgz into studio/extensions/larksuite-openclaw-lark-2026.3.24.tgz
-# before docker build (see README); CI does this automatically.
-RUN test -f extensions/larksuite-openclaw-lark-2026.3.24.tgz \
-  || (echo "ERROR: extensions/larksuite-openclaw-lark-2026.3.24.tgz is missing. From monorepo root: mkdir -p studio/extensions && cp deploy/openclaw-extensions/larksuite-openclaw-lark-2026.3.24.tgz studio/extensions/larksuite-openclaw-lark-2026.3.24.tgz" >&2; exit 1)
-
 RUN npm config set registry https://registry.npmmirror.com \
     && npm install -g pnpm \
     && pnpm install \

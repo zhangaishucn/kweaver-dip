@@ -198,13 +198,6 @@ jobs:
           mkdir -p extensions
           cp -R ../deploy/openclaw-extensions/dip extensions/dip
 
-      - name: Sync openclaw-lark extension into Docker build context
-        if: github.event_name != 'pull_request'
-        run: |
-          rm -f extensions/larksuite-openclaw-lark-2026.3.24.tgz
-          mkdir -p extensions
-          cp ../deploy/openclaw-extensions/larksuite-openclaw-lark-2026.3.24.tgz extensions/larksuite-openclaw-lark-2026.3.24.tgz
-
       - name: Prepare Image Metadata
         if: github.event_name != 'pull_request'
         id: prepare

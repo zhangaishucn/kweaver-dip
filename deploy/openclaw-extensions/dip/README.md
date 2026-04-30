@@ -1,16 +1,17 @@
 # DIP OpenClaw 插件
 
-`dip` 是一个 OpenClaw 网关扩展，当前主要提供三类能力：
+`dip` 是一个 OpenClaw 网关扩展，当前主要提供四类能力：
 
 1. **Agent skills**：按 agent 读写技能绑定、通过 Gateway 上传 `.skill`（zip）安装到仓库 `skills/`，以及读取 skill 目录内容。
 2. **工作区 archives**：HTTP 读取 `archives/`，以及通过工具执行归档搬移与 cron run 镜像。
 3. **内置技能包**：插件目录下附带若干 skill 文档，供 Studio 侧状态管理与内容访问使用。
 4. **工作区临时上传**：将上传文件写入 `workspace/tmp`（可按会话分目录）。
 
-插件自身打包了 2 个 skills：
+插件自身打包了 3 个 skills：
 
 - `archive-protocol`
 - `schedule-plan`
+- `feishu-push`
 
 ## 当前实现的能力
 
@@ -187,7 +188,7 @@ POST /v1/workspace/tmp/upload
 }
 ```
 
-### 4. 归档执行约束
+### 5. 归档执行约束
 
 插件当前不再依赖 `after_tool_call` hook 自动补齐归档。归档由 `archive` 工具显式完成，原因是：
 
@@ -226,6 +227,18 @@ POST /v1/workspace/tmp/upload
 
 注意：插件代码当前没有直接提供 Cron、提醒或自动化创建接口；这里只打包了该 skill 文档。
 
+### `feishu-push`
+
+这是一个飞书消息推送 skill，当前文档要求：
+
+- 使用飞书开放平台机器人消息 API 向用户或群组推送消息
+- 支持通过 `open_id`、`union_id`、`user_id`、`email`、`chat_id` 定位接收者
+- 默认支持文本消息，并说明 `post`、`image`、`file`、`interactive` 等飞书消息类型
+- 运行前需配置 `FEISHU_APP_ID` 与 `FEISHU_APP_SECRET`
+- 随 skill 附带 `send_text.py` 与 `send_text.sh` 两个文本消息发送 helper
+
+注意：该 skill 通过飞书开放平台 HTTP API 工作；运行环境需要能访问 `open.feishu.cn`，并且 Python helper 需要可用的 `requests` 包。
+
 ## 安装与启用
 
 将本目录部署到 OpenClaw 扩展目录后，在配置中启用插件：
@@ -246,6 +259,6 @@ POST /v1/workspace/tmp/upload
 
 - 插件 id：`dip`
 - 插件扩展入口：`./index.ts`
-- 插件内置 skills 目录：`./skills`
+- 插件内置 skills 目录：`./skills`（当前包含 `archive-protocol`、`schedule-plan`、`feishu-push`）
 
 若使用 `POST /v1/config/agents/skills/install`，请确保网关进程所在环境可调用 `tar` 或 `unzip`（见上文「安装 `.skill` 包」）。
