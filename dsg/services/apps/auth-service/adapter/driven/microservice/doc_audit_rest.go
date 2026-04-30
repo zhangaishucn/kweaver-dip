@@ -9,10 +9,10 @@ import (
 	"net/url"
 	"path"
 
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/dto"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/errorcode"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/settings"
 	"github.com/kweaver-ai/idrm-go-common/interception"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/dto"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/errorcode"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/settings"
 )
 
 // DocAuditRESTRepo 定义微服务 doc-audit-rest 接口，再原生接口的基础上提供更多方法

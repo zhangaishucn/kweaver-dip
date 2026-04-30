@@ -5,17 +5,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/adapter/driven/gorm"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/dto"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/enum"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/errorcode"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/util"
-	"github.com/kweaver-ai/idrm-go-frame/core/telemetry/log"
-	"github.com/samber/lo"
-	"go.uber.org/zap"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/kweaver-ai/idrm-go-frame/core/telemetry/log"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/adapter/driven/gorm"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/dto"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/enum"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/errorcode"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/util"
+	"github.com/samber/lo"
+	"go.uber.org/zap"
 )
 
 const (

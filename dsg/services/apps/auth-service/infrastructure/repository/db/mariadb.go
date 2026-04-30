@@ -6,7 +6,7 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/settings"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/settings"
 )
 
 func NewMariaDB(s *settings.Settings) (*gorm.DB, error) {

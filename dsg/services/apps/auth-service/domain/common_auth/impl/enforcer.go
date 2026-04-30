@@ -3,14 +3,6 @@ package impl
 import (
 	"context"
 
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/adapter/driven/database"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/adapter/driven/database/af_configuration"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/adapter/driven/gorm"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/dto"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/enum"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/util"
-	domain "github.com/kweaver-ai/dsg/services/apps/auth-service/domain/common_auth"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/infrastructure/repository/redis"
 	auth_service_v1 "github.com/kweaver-ai/idrm-go-common/api/auth-service/v1"
 	meta_v1 "github.com/kweaver-ai/idrm-go-common/api/meta/v1"
 	auth_service "github.com/kweaver-ai/idrm-go-common/rest/auth-service"
@@ -23,6 +15,14 @@ import (
 	goCommomUtil "github.com/kweaver-ai/idrm-go-common/util"
 	gutil "github.com/kweaver-ai/idrm-go-common/util"
 	"github.com/kweaver-ai/idrm-go-frame/core/telemetry/log"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/adapter/driven/database"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/adapter/driven/database/af_configuration"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/adapter/driven/gorm"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/dto"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/enum"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/util"
+	domain "github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/domain/common_auth"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/infrastructure/repository/redis"
 	"github.com/samber/lo"
 	"go.uber.org/zap"
 )
@@ -107,6 +107,7 @@ func (a *auth) CurrentUserEnforce(ctx context.Context, req *dto.CurrentUserEnfor
 		},
 		Operation: []string{req.Action},
 		Method:    "GET",
+		Include:   []string{},
 	}
 	result, err := a.driven.OperationCheck(ctx, arg)
 	if err != nil {
@@ -114,6 +115,39 @@ func (a *auth) CurrentUserEnforce(ctx context.Context, req *dto.CurrentUserEnfor
 		return false, err
 	}
 	return result.Result, nil
+}
+
+// CurrentUserBatchEnforce 当前用户的批量策略验证
+func (a *auth) CurrentUserBatchEnforce(ctx context.Context, req *dto.CurrentUserBatchEnforce) ([]bool, error) {
+	userInfo, err := gutil.GetUserInfo(ctx)
+	if err != nil {
+		return nil, err
+	}
+	arg := &authorization.ResourceFilterArgs{
+		AllowOperation: true,
+		Accessor: authorization.Accessor{
+			ID:   userInfo.ID,
+			Type: dto.SubjectUser.String(),
+		},
+		Resources: req.ResourceObjects(),
+		Operation: req.Action,
+		Method:    "GET",
+		Include:   []string{},
+	}
+	result, err := a.driven.ResourceFilter(ctx, arg)
+	if err != nil {
+		log.Errorf("CheckUserPermission Error %v", err.Error())
+		return nil, err
+	}
+	results := make([]bool, 0, len(req.Resouces))
+	for index, r := range result {
+		if r.Id == req.Resouces[index].ObjectId && req.HasAllAction(result[index].AllowOperation) {
+			results = append(results, true)
+		} else {
+			results = append(results, false)
+		}
+	}
+	return results, nil
 }
 
 // GetObjectsBySubjectId 查询用户的所有权限配置

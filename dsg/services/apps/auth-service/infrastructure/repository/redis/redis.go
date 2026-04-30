@@ -3,7 +3,7 @@ package redis
 import (
 	"sync"
 
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/settings"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/settings"
 	"github.com/redis/go-redis/v9"
 )
 

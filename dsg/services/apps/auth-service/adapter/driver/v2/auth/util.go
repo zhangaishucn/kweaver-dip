@@ -2,15 +2,16 @@ package auth
 
 import (
 	"fmt"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/dto"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/form_validator"
 	v1 "github.com/kweaver-ai/idrm-go-common/api/auth-service/v1"
 	"github.com/kweaver-ai/idrm-go-common/api/auth-service/v1/validation"
 	"github.com/kweaver-ai/idrm-go-common/interception"
 	middleware "github.com/kweaver-ai/idrm-go-common/middleware/v1"
 	"github.com/kweaver-ai/idrm-go-common/util/validation/field"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/dto"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/form_validator"
 )
 
 func validateObjectTypeAndSubjectTypes(objectType string, subjects []dto.Subject) (allErrs field.ErrorList) {

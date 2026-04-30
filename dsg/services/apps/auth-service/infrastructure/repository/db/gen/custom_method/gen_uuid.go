@@ -1,7 +1,7 @@
 package custom_method
 
 import (
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/util"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/util"
 	"gorm.io/gorm"
 )
 

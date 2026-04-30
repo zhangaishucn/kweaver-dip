@@ -5,13 +5,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/util"
 	"github.com/kweaver-ai/idrm-go-common/rest/authorization"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/util"
 	"github.com/samber/lo"
 
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/util/sets"
 	audit_v1 "github.com/kweaver-ai/idrm-go-common/api/audit/v1"
 	meta_v1 "github.com/kweaver-ai/idrm-go-common/api/meta/v1"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/util/sets"
 )
 
 // SubjectType 定义访问者的类型
@@ -510,6 +510,24 @@ type CurrentUserEnforce struct {
 	ObjectId   string `json:"object_id" form:"object_id" binding:"required,VerifyNameEn,max=128"` //资源id
 	ObjectType string `json:"object_type" form:"object_type" binding:"required"`                  //资源类型 domain 主题域 data_view 逻辑视图 api 接口 sub_view 子视图 indicator 指标
 	Action     string `json:"action" form:"action" binding:"required"`                            //检查的操作，逗号分割的字符串                                                                                           //请求动作 view 查看 read 读取 download 下载
+}
+
+type CurrentUserBatchEnforce struct {
+	Resouces []Object `json:"resouces" form:"resouces" binding:"required"`                                             //资源列表
+	Action   []string `json:"action" form:"action" binding:"required,dive,oneof=data_query view_detail modify delete"` //检查的操作，逗号分割的字符串                                                                                           //请求动作 view 查看 read 读取 download 下载
+}
+
+func (c *CurrentUserBatchEnforce) HasAllAction(actions []string) bool {
+	return lo.Every(actions, c.Action)
+}
+
+func (c *CurrentUserBatchEnforce) ResourceObjects() []authorization.ResourceObject {
+	return lo.Times(len(c.Resouces), func(index int) authorization.ResourceObject {
+		return authorization.ResourceObject{
+			ID:   c.Resouces[index].ObjectId,
+			Type: c.Resouces[index].ObjectType,
+		}
+	})
 }
 
 const (

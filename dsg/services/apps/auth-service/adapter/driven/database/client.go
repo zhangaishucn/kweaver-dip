@@ -1,11 +1,11 @@
 package database
 
 import (
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/infrastructure/repository/db"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/infrastructure/repository/db"
 	"gorm.io/gorm"
 
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/adapter/driven/database/af_configuration"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/adapter/driven/database/dynamic"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/adapter/driven/database/af_configuration"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/adapter/driven/database/dynamic"
 )
 
 type Client struct {

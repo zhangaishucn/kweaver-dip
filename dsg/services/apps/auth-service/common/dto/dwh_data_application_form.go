@@ -1,9 +1,10 @@
 package dto
 
 import (
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/infrastructure/repository/db/model"
-	meta_v1 "github.com/kweaver-ai/idrm-go-common/api/meta/v1"
 	"time"
+
+	meta_v1 "github.com/kweaver-ai/idrm-go-common/api/meta/v1"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/infrastructure/repository/db/model"
 )
 
 // DataAuthRequestArg 数仓数据申请的创建，修改参数

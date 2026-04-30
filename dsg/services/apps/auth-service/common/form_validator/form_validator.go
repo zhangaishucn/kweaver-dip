@@ -10,8 +10,8 @@ import (
 	"github.com/gin-gonic/gin/binding"
 	ut "github.com/go-playground/universal-translator"
 	"github.com/go-playground/validator/v10"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/util/validation/field"
 	common_field "github.com/kweaver-ai/idrm-go-common/util/validation/field"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/util/validation/field"
 )
 
 // ValidError 定义参数校验错误

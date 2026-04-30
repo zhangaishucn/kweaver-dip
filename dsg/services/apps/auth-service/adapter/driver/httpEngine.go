@@ -2,17 +2,18 @@ package driver
 
 import (
 	"errors"
-	"github.com/gin-gonic/gin"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/cmd/server/docs"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/settings"
-	"github.com/kweaver-ai/idrm-go-frame/core/telemetry/log"
-	"github.com/kweaver-ai/idrm-go-frame/core/transport/rest"
-	"go.uber.org/zap"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/gin-gonic/gin"
+	"github.com/kweaver-ai/idrm-go-frame/core/telemetry/log"
+	"github.com/kweaver-ai/idrm-go-frame/core/transport/rest"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/cmd/server/docs"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/settings"
+	"go.uber.org/zap"
 )
 
 func NewHttpServer(s *settings.Settings, r IRouter) *rest.Server {

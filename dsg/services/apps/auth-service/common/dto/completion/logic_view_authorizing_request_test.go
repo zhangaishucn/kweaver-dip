@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/dto"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/dto"
 )
 
 func TestCompleteLogicViewAuthorizingRequestSpec(t *testing.T) {

@@ -53,16 +53,21 @@ class KafkaService:
             kafka_passwd  =  getattr(
                 settings, 'KAFKA_PASSWORD', ''
             )
+            kafka_user  =  getattr(
+                settings, 'KAFKA_USER', ''
+            )
         else:
             self.bootstrap_servers = bootstrap_servers or 'localhost:9092'
             kafka_passwd = ""
+            kafka_user = ""
+        logger.info(f"[KafkaService] kafka_user={kafka_user}, kafka_passwd={kafka_passwd}")
 
         
         # KafkaProducer 配置
         producer_config = {
             "sasl_mechanism": "PLAIN",
             "security_protocol": 'SASL_PLAINTEXT',
-            "sasl_plain_username": "kafkaclient",
+            "sasl_plain_username": kafka_user,
             "sasl_plain_password": kafka_passwd,
             "bootstrap_servers": self.bootstrap_servers.split(','),
             "key_serializer": lambda k: json.dumps(k).encode(),

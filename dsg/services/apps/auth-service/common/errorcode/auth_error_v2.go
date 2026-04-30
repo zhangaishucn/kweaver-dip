@@ -14,6 +14,7 @@ var (
 	DWHDataModule  = errorx.New(ServiceName + ".DataApplicationForm.")
 	workflowModule = errorx.New(ServiceName + ".Workflow.")
 	UserModule     = errorx.New(ServiceName + ".UserModule.")
+	DataAuthModule = errorx.New(ServiceName + ".DataAuth.")
 )
 
 var (
@@ -50,5 +51,7 @@ var (
 )
 
 var (
-	UserNotExistErr = UserModule.Description("UserNotExistError", "用户不存在")
+	UserNotExistErr      = UserModule.Description("UserNotExistError", "用户不存在")
+	GetUserInfoFailedErr = UserModule.Description("GetUserInfoFailedErr", "获取用户信息失败")
+	SendAuditApplyMsgErr = UserModule.Description("SendAuditApplyMsgError", "发送审核信息错误")
 )

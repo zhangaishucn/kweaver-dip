@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/util/validation/field"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/util/validation/field"
 )
 
 func TestNewValidErrorForFieldError(t *testing.T) {

@@ -8,9 +8,9 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/dto"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/errorcode"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/infrastructure/repository/db/model"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/dto"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/errorcode"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/infrastructure/repository/db/model"
 )
 
 type LogicViewAuthorizingRequestRepo interface {

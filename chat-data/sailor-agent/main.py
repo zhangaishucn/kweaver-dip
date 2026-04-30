@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 from app import create_app
 from app.utils.exception import UnicornException, NewErrorBase, ErrVal, RequestException
 from config import settings
+from data_migrations.init.manage_built_in_agent_and_tool import init_built_in_agent_and_tool
 
 app = create_app()
 
@@ -44,6 +45,9 @@ async def validation_exception_handler(request: Request,
         content=jsonable_encoder(err.err_model.dict()),
     )
 
+
+# 初始化内置工具箱, 如果失败会进行重试
+init_built_in_agent_and_tool()
 
 if __name__ == '__main__':
     import uvicorn

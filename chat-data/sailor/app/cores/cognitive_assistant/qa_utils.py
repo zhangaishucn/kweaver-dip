@@ -4,7 +4,7 @@ import urllib3
 import requests
 from typing import List, Type
 from urllib.parse import urlsplit
-from app.utils.get_token import init_token
+# from app.utils.get_token import init_token
 from app.cores.cognitive_assistant.qa_func import get_path
 from pydantic import BaseModel, Field, create_model
 from app.cores.cognitive_assistant.qa_model import (
@@ -29,13 +29,14 @@ class AFServiceFunction:
         self.app_secret = app_secret
 
     async def __call__(self, **kwargs):
-        token = init_token(
-            url_type=self.url_type,
-            url_path=urlsplit(self.url_path)[2],
-            app_id=self.app_id,
-            app_secret=self.app_secret,
-            **kwargs
-        )
+        # token = init_token(
+        #     url_type=self.url_type,
+        #     url_path=urlsplit(self.url_path)[2],
+        #     app_id=self.app_id,
+        #     app_secret=self.app_secret,
+        #     **kwargs
+        # )
+        token = kwargs.get("token", "")
         timeout = aiohttp.ClientTimeout(total=20)
         try:
             if self.url_type in self.post_list:

@@ -122,6 +122,10 @@
                           "id": {
                             "type": "integer"
                           },
+                          "title": {
+                            "type": "string",
+                            "description": "任务标题"
+                          },
                           "task": {
                             "type": "string",
                             "description": "任务内容（与 todo_list 缓存结构一致）"

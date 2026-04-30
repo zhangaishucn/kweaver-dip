@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/dto"
 	auth_service_v1 "github.com/kweaver-ai/idrm-go-common/api/auth-service/v1"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/dto"
 )
 
 // CheckUserCreatePermission 检查用户创建权限

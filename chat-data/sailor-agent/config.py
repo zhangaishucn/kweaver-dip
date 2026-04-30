@@ -136,6 +136,9 @@ class Settings(BaseSettings):
     # 知识网络管理接口
     KNOWLEDGE_NETWORK_API_BASE: str = "http://bkn-backend-svc:13014/api/ontology-manager"
 
+    AGENT_OPERATOR_INTEGRATION_HOST: str = os.getenv("AGENT_OPERATOR_INTEGRATION_SVC_HOST", "agent-operator-integration")
+    AGENT_OPERATOR_INTEGRATION_PORT: str = os.getenv("AGENT_OPERATOR_INTEGRATION_SVC_PORT", "9000")
+
 
 class Config:
     TIMES: int = 3

@@ -8,11 +8,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
 
-	auth_v2 "github.com/kweaver-ai/dsg/services/apps/auth-service/adapter/driver/v2/auth"
 	"github.com/kweaver-ai/idrm-go-common/interception"
 	"github.com/kweaver-ai/idrm-go-common/middleware"
 	"github.com/kweaver-ai/idrm-go-frame/core/telemetry/log"
 	"github.com/kweaver-ai/idrm-go-frame/core/telemetry/trace"
+	auth_v2 "github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/adapter/driver/v2/auth"
+	data_auth_v2 "github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/adapter/driver/v2/data_auth"
 )
 
 var _ IRouter = (*Router)(nil)
@@ -49,6 +50,7 @@ type IRouter interface {
 type Router struct {
 	Middleware       middleware.Middleware
 	AuthV2Controller *auth_v2.Controller
+	DataAuthV2       *data_auth_v2.Controller
 }
 
 func (r *Router) Register(engine *gin.Engine) error {
@@ -62,8 +64,9 @@ func LocalToken() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tokenID := c.GetHeader("Authorization")
 		userInfo := &middleware.User{
-			ID:   "82cdcd86-dbf1-11f0-af22-f69a51d1d671",
-			Name: "zyy",
+			ID:       "eb4dae48-3e12-11f1-b0e8-261248b384b3",
+			Name:     "liberly",
+			UserType: 0,
 		}
 		c.Set(interception.InfoName, userInfo)
 		c.Set(interception.Token, tokenID)
@@ -88,9 +91,10 @@ func (r *Router) RegisterApi(engine *gin.Engine) {
 		policyRouter.DELETE("", r.AuthV2Controller.Delete) // 策略删除
 
 		//资源接口
-		router.GET("/subject/objects", r.AuthV2Controller.GetObjectsBySubjectId)     // 访问者拥有的资源
-		router.GET("/sub-views", r.AuthV2Controller.ListSubViews)                    // 获取拥有指定动作权限的子视图列表
-		router.GET("/menu-resource/actions", r.AuthV2Controller.MenuResourceActions) //查询菜单资源的允许的操作
+		router.GET("/subject/objects", r.AuthV2Controller.GetObjectsBySubjectId)             // 访问者拥有的资源
+		router.GET("/sub-views", r.AuthV2Controller.ListSubViews)                            // 获取拥有指定动作权限的子视图列表
+		router.GET("/menu-resource/actions", r.AuthV2Controller.MenuResourceActions)         //查询菜单资源的允许的操作
+		router.POST("/data-resource/operations", r.AuthV2Controller.UserOperationBatchCheck) //数据资源批量策略验证
 		//策略验证
 		rawRouter := engine.Group("/api/auth-service/v1")
 		rawRouter.POST("/enforce", setContextWithToken, r.AuthV2Controller.Enforce) //策略验证
@@ -101,6 +105,10 @@ func (r *Router) RegisterApi(engine *gin.Engine) {
 		routerInternal.POST("/rule/enforce", setContextWithToken, r.AuthV2Controller.RuleEnforce)                  //数据策略验证
 		routerInternal.POST("/menu-resource/enforce", setContextWithToken, r.AuthV2Controller.MenuResourceEnforce) //权限资源验证, 废弃
 		routerInternal.GET("/menu-resource/actions", setContextWithToken, r.AuthV2Controller.MenuResourceActions)  //查询菜单资源的允许的操作
+
+		// 数据资源授权申请
+		dataAuthRouter := router.Group("/data-auth")
+		dataAuthRouter.POST("/apply", r.DataAuthV2.Apply) // 申请权限
 	}
 
 }

@@ -1,8 +1,8 @@
 package validation
 
 import (
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/dto"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/util/validation/field"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/dto"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/util/validation/field"
 )
 
 // TODO: 最大值定义应该在类似 API 定义的模块

@@ -15,15 +15,15 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/imroc/req/v3"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/dto"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/errorcode"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/settings"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/util"
 	"github.com/kweaver-ai/idrm-go-common/interception"
 	"github.com/kweaver-ai/idrm-go-frame/core/errorx/agcodes"
 	"github.com/kweaver-ai/idrm-go-frame/core/errorx/agerrors"
 	"github.com/kweaver-ai/idrm-go-frame/core/telemetry/log"
 	"github.com/kweaver-ai/idrm-go-frame/core/transport/rest/ginx"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/dto"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/errorcode"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/settings"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/util"
 )
 
 type DataViewGetRes struct {

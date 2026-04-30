@@ -2824,7 +2824,7 @@ async def resource_analysis_search_kecc(request, search_params, search_configs):
 
 async def main():
     # from kafka import KafkaProducer
-    ad_appid = '
+    ad_appid = ''
     # 认知搜索图谱
     # kg_id = 6838
     # 部门职责知识增强图谱

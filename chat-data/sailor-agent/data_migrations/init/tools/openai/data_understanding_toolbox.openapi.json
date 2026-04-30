@@ -1,0 +1,542 @@
+{
+  "openapi": "3.1.0",
+  "servers": [
+    {
+      "url": "http://af-sailor-agent:9595",
+      "description": "服务器地址"
+    }
+  ],
+  "info": {
+    "title": "数据理解工具箱",
+    "description": "数据理解 kweaver",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/af-sailor-agent/v1/assistant/tools/data_classification_detect": {
+      "post": {
+        "tags": [
+          "data_analysis"
+        ],
+        "summary": "数据分类分级工具",
+        "description": "对数据库表进行业务分类和数据分级，识别业务领域、数据类型、数据来源和重要性级别",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "auth": {
+                    "description": "认证参数",
+                    "properties": {
+                      "auth_url": {
+                        "type": "string"
+                      },
+                      "password": {
+                        "type": "string"
+                      },
+                      "token": {
+                        "type": "string"
+                      },
+                      "user": {
+                        "type": "string"
+                      },
+                      "user_id": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "config": {
+                    "description": "工具配置参数",
+                    "properties": {
+                      "background": {
+                        "description": "背景上下文信息",
+                        "type": "string"
+                      },
+                      "data_source_num_limit": {
+                        "description": "数据源数量限制，默认-1（无限制）",
+                        "type": "integer"
+                      },
+                      "dimension_num_limit": {
+                        "description": "维度数量限制，默认-1（无限制）",
+                        "type": "integer"
+                      },
+                      "with_sample": {
+                        "description": "是否包含样例数据，默认false",
+                        "type": "boolean"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "data_view_list": {
+                    "description": "库表id列表，需要分类分级的表ID列表",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "llm": {
+                    "description": "LLM 配置参数",
+                    "type": "object"
+                  },
+                  "query": {
+                    "description": "用户的查询需求，用于理解分类分级上下文",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "query",
+                  "data_view_list"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "result": {
+                      "description": "数据分类分级结果",
+                      "type": "object"
+                    },
+                    "result_cache_key": {
+                      "description": "结果缓存key",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/af-sailor-agent/v1/assistant/tools/explore_rule_identification": {
+      "post": {
+        "tags": [
+          "data_analysis"
+        ],
+        "summary": "质量规则识别工具",
+        "description": "从库表列表中识别数据质量规则和约束条件，包括完整性、准确性、一致性、时效性、有效性、合理性等规则",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "auth": {
+                    "description": "认证参数",
+                    "properties": {
+                      "auth_url": {
+                        "type": "string"
+                      },
+                      "password": {
+                        "type": "string"
+                      },
+                      "token": {
+                        "type": "string"
+                      },
+                      "user": {
+                        "type": "string"
+                      },
+                      "user_id": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "config": {
+                    "description": "工具配置参数",
+                    "properties": {
+                      "background": {
+                        "description": "背景上下文信息",
+                        "type": "string"
+                      },
+                      "data_source_num_limit": {
+                        "description": "数据源数量限制，默认-1（无限制）",
+                        "type": "integer"
+                      },
+                      "dimension_num_limit": {
+                        "description": "维度数量限制，默认-1（无限制）",
+                        "type": "integer"
+                      },
+                      "with_sample": {
+                        "description": "是否包含样例数据，默认false",
+                        "type": "boolean"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "data_view_list": {
+                    "description": "库表id列表，需要识别质量规则的表ID列表",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "llm": {
+                    "description": "LLM 配置参数",
+                    "type": "object"
+                  },
+                  "query": {
+                    "description": "用户的查询需求，用于理解质量规则识别上下文",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "query",
+                  "data_view_list"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "result": {
+                      "description": "质量规则识别结果",
+                      "type": "object"
+                    },
+                    "result_cache_key": {
+                      "description": "结果缓存key",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/af-sailor-agent/v1/assistant/tools/semantic_complete": {
+      "post": {
+        "tags": [
+          "data_analysis"
+        ],
+        "summary": "语义补全工具",
+        "description": "语义补全工具是一款面向数据库开发、数据治理、数据分析场景的智能化辅助工具，核心功能是针对数据库中的库表名称、字段名称，自动完成语义化中文名补全，解决数据库对象 “英文缩写无释义”“命名不规范”“语义不清晰” 的痛点问题",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "auth": {
+                    "description": "认证参数",
+                    "properties": {
+                      "auth_url": {
+                        "type": "string"
+                      },
+                      "password": {
+                        "type": "string"
+                      },
+                      "token": {
+                        "type": "string"
+                      },
+                      "user": {
+                        "type": "string"
+                      },
+                      "user_id": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "config": {
+                    "description": "工具配置参数",
+                    "properties": {
+                      "background": {
+                        "description": "背景上下文信息",
+                        "type": "string"
+                      },
+                      "data_item_ids": {
+                        "description": "知识条目id列表, 逗号隔开",
+                        "type": "string"
+                      },
+                      "data_source_num_limit": {
+                        "description": "数据源数量限制，默认-1（无限制）",
+                        "type": "integer"
+                      },
+                      "dimension_num_limit": {
+                        "description": "维度数量限制，默认-1（无限制）",
+                        "type": "integer"
+                      },
+                      "with_sample": {
+                        "description": "是否包含样例数据，默认false",
+                        "type": "boolean"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "data_view_list": {
+                    "description": "库表id列表，需要语义补全的表ID列表",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "llm": {
+                    "description": "LLM 配置参数",
+                    "type": "object"
+                  },
+                  "query": {
+                    "description": "用户的查询需求，用于理解检测上下文",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "query",
+                  "data_view_list"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/af-sailor-agent/v1/assistant/tools/sensitive_data_detect": {
+      "post": {
+        "tags": [
+          "data_analysis"
+        ],
+        "summary": "敏感字段检测工具",
+        "description": "检测数据库表中可能包含敏感信息的字段，识别个人身份信息、财务信息、健康信息等敏感数据类型",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "auth": {
+                    "description": "认证参数",
+                    "properties": {
+                      "auth_url": {
+                        "type": "string"
+                      },
+                      "password": {
+                        "type": "string"
+                      },
+                      "token": {
+                        "type": "string"
+                      },
+                      "user": {
+                        "type": "string"
+                      },
+                      "user_id": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "config": {
+                    "description": "工具配置参数",
+                    "properties": {
+                      "background": {
+                        "description": "背景上下文信息",
+                        "type": "string"
+                      },
+                      "data_source_num_limit": {
+                        "description": "数据源数量限制，默认-1（无限制）",
+                        "type": "integer"
+                      },
+                      "dimension_num_limit": {
+                        "description": "维度数量限制，默认-1（无限制）",
+                        "type": "integer"
+                      },
+                      "with_sample": {
+                        "description": "是否包含样例数据，默认false",
+                        "type": "boolean"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "data_view_list": {
+                    "description": "库表id列表，需要检测敏感字段的表ID列表",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "llm": {
+                    "description": "LLM 配置参数",
+                    "type": "object"
+                  },
+                  "query": {
+                    "description": "用户的查询需求，用于理解检测上下文",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "query",
+                  "data_view_list"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "result": {
+                      "description": "敏感字段检测结果",
+                      "type": "object"
+                    },
+                    "result_cache_key": {
+                      "description": "结果缓存key",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/af-sailor-agent/v1/assistant/tools/business_object_identification": {
+      "post": {
+        "tags": [
+          "data_analysis"
+        ],
+        "summary": "业务对象识别工具",
+        "description": "从库表列表中识别业务对象，分析表的业务含义和对象特征",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "auth": {
+                    "description": "认证参数",
+                    "properties": {
+                      "auth_url": {
+                        "type": "string"
+                      },
+                      "password": {
+                        "type": "string"
+                      },
+                      "token": {
+                        "type": "string"
+                      },
+                      "user": {
+                        "type": "string"
+                      },
+                      "user_id": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "config": {
+                    "description": "工具配置参数",
+                    "properties": {
+                      "background": {
+                        "description": "背景上下文信息",
+                        "type": "string"
+                      },
+                      "data_item_ids": {
+                        "description": "知识条目id列表, 逗号隔开",
+                        "type": "string"
+                      },
+                      "data_source_num_limit": {
+                        "description": "数据源数量限制，默认-1（无限制）",
+                        "type": "integer"
+                      },
+                      "dimension_num_limit": {
+                        "description": "维度数量限制，默认-1（无限制）",
+                        "type": "integer"
+                      },
+                      "with_sample": {
+                        "description": "是否包含样例数据，默认false",
+                        "type": "boolean"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "data_view_list": {
+                    "description": "库表id列表，需要识别业务对象的表ID列表",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "llm": {
+                    "description": "LLM 配置参数",
+                    "type": "object"
+                  },
+                  "query": {
+                    "description": "用户的查询需求，用于理解业务对象识别上下文",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "query",
+                  "data_view_list"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "result": {
+                      "description": "业务对象识别结果",
+                      "type": "object"
+                    },
+                    "result_cache_key": {
+                      "description": "结果缓存key",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {}
+  }
+}

@@ -134,6 +134,7 @@ class TaskManagerTool(LLMTool):
         status = data.get("status", "")
         if not tasks:
             return None
+
         if status == "completed" or all(t.get("status") == "completed" for t in tasks):
             return None
         return data
@@ -477,8 +478,9 @@ class TaskManagerTool(LLMTool):
                                                     "title": {
                                                         "type": "string"
                                                     },
-                                                    "detail": {
-                                                        "type": "string"
+                                                    "task": {
+                                                        "type": "string",
+                                                        "description": "任务内容（与 todo_list 缓存结构一致）",
                                                     },
                                                     "tools": {
                                                         "type": "array",

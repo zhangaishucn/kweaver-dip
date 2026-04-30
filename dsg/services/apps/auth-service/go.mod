@@ -1,4 +1,4 @@
-module github.com/kweaver-ai/dsg/services/apps/auth-service
+module github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service
 
 go 1.24.0
 
@@ -18,7 +18,7 @@ require (
 	github.com/jinzhu/copier v0.4.0
 	github.com/json-iterator/go v1.1.12
 	github.com/kweaver-ai/TelemetrySDK-Go/exporter/v2 v2.10.2
-	github.com/kweaver-ai/idrm-go-common v0.1.6-0.20260327102030-245426ff3085
+	github.com/kweaver-ai/idrm-go-common v0.1.6-0.20260430032201-124de78104e7
 	github.com/kweaver-ai/idrm-go-frame v0.1.4-0.20260227065704-e2e78cd5f96e
 	github.com/redis/go-redis/v9 v9.17.2
 	github.com/samber/lo v1.52.0

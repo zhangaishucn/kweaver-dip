@@ -2,6 +2,7 @@
 import math
 import asyncio
 import traceback
+import time
 from textwrap import dedent
 from typing import Optional, Type, Any, List, Dict
 from collections import OrderedDict
@@ -166,6 +167,11 @@ class DataSourceRerankTool(LLMTool):
         custom_rule_strategy_cache_key: Optional[str] = None,
         run_manager: Optional[AsyncCallbackManagerForToolRun] = None,
     ):
+        total_start = time.perf_counter()
+        view_meta_cost_ms = 0.0
+        catalog_meta_cost_ms = 0.0
+        llm_cost_ms = 0.0
+        postprocess_cost_ms = 0.0
         data_view_list, metric_list, data_catalog_list = OrderedDict(), OrderedDict(), OrderedDict()
         data_source_list = data_source_list or []
 
@@ -288,6 +294,7 @@ class DataSourceRerankTool(LLMTool):
         priority_table_info = {}
         n_data_view_list = []
         if len(data_view_list) > 0:
+            view_meta_start = time.perf_counter()
 
             # 查看优先匹配的库表是否在召回中（仅在启用优先搜索策略时）
             if self.use_priority_strategy and priority_table_id and priority_table_id not in data_view_list:
@@ -324,52 +331,60 @@ class DataSourceRerankTool(LLMTool):
                                 "type": v["type"],
                                 "title": v.get("title", ""),
                                 "description": v.get("description", ""),
-                                "columns": v["columns"],
+                                "columns": [],
                             })
                             break
                 if priority_table_id in data_view_list:
                     priority_table_info = data_view_list[priority_table_id]
                     none_value = data_view_list.pop(priority_table_id, None)
+                view_meta_cost_ms = (time.perf_counter() - view_meta_start) * 1000
 
             except Exception as e:
+                view_meta_cost_ms = (time.perf_counter() - view_meta_start) * 1000
                 logger.error(f"获取数据视图元数据失败: {e}")
 
         n_data_catalog_list = []
         if len(data_catalog_list) > 0:
-            catalog_source = AFDataCatalog(
-                data_catalog_list=list(data_catalog_list.keys()),
-                token=self.token,
-                user_id=self.user_id
-            )
-            catalog_metadata = catalog_source.get_meta_sample_data_v2(
-                query,
-                self.data_source_num_limit,
-                self.dimension_num_limit,
+            catalog_meta_start = time.perf_counter()
+            try:
+                catalog_source = AFDataCatalog(
+                    data_catalog_list=list(data_catalog_list.keys()),
+                    token=self.token,
+                    user_id=self.user_id
+                )
+                catalog_metadata = catalog_source.get_meta_sample_data_v2(
+                    query,
+                    self.data_source_num_limit,
+                    self.dimension_num_limit,
 
-            )
+                )
 
-            for k, v in data_catalog_list.items():
-                for detail in catalog_metadata["detail"]:
-                    if detail["id"] == k:
-                        v["columns"] = detail.get("columns", {})
-                        # 补充 title 和 description 字段
-                        if "title" not in v or not v.get("title"):
-                            v["title"] = detail.get("name", detail.get("title", ""))
-                        if "description" not in v or not v.get("description"):
-                            v["description"] = detail.get("description", "")
-                        v["department_id"] = detail.get("department_id", "")
-                        v["department"] = detail.get("department", "")
-                        v["info_system_id"] = detail.get("info_system_id", "")
-                        v["info_system"] = detail.get("info_system", "")
+                for k, v in data_catalog_list.items():
+                    for detail in catalog_metadata["detail"]:
+                        if detail["id"] == k:
+                            v["columns"] = detail.get("columns", {})
+                            # 补充 title 和 description 字段
+                            if "title" not in v or not v.get("title"):
+                                v["title"] = detail.get("name", detail.get("title", ""))
+                            if "description" not in v or not v.get("description"):
+                                v["description"] = detail.get("description", "")
+                            v["department_id"] = detail.get("department_id", "")
+                            v["department"] = detail.get("department", "")
+                            v["info_system_id"] = detail.get("info_system_id", "")
+                            v["info_system"] = detail.get("info_system", "")
 
-                        n_data_catalog_list.append({
-                            "id": v["id"],
-                            "type": v["type"],
-                            "title": v.get("title", ""),
-                            "description": v.get("description", ""),
-                            "columns": v["columns"],
-                        })
-                        break
+                            n_data_catalog_list.append({
+                                "id": v["id"],
+                                "type": v["type"],
+                                "title": v.get("title", ""),
+                                "description": v.get("description", ""),
+                                "columns": v["columns"],
+                            })
+                            break
+                catalog_meta_cost_ms = (time.perf_counter() - catalog_meta_start) * 1000
+            except Exception:
+                catalog_meta_cost_ms = (time.perf_counter() - catalog_meta_start) * 1000
+                raise
         
         if not n_data_view_list and not metric_list and not n_data_catalog_list:
             result = {
@@ -380,6 +395,15 @@ class DataSourceRerankTool(LLMTool):
                 result["department_duty_info"] = department_duty_info
             if custom_rule_strategy_info:
                 result["custom_rule_strategy_info"] = custom_rule_strategy_info
+            total_cost_ms = (time.perf_counter() - total_start) * 1000
+            logger.info(
+                f"{from_datasource_rerank} perf | total={total_cost_ms:.2f}ms "
+                f"view_meta={view_meta_cost_ms:.2f}ms catalog_meta={catalog_meta_cost_ms:.2f}ms "
+                f"llm={llm_cost_ms:.2f}ms postprocess={postprocess_cost_ms:.2f}ms "
+                f"input_count={len(data_source_list)} view_count={len(data_view_list)} "
+                f"metric_count={len(metric_list)} catalog_count={len(data_catalog_list)} "
+                f"selected_count=0 filtered_count=0"
+            )
             return result
 
         logger.info("resource token size {}".format(len(str(n_data_view_list))))
@@ -398,8 +422,11 @@ class DataSourceRerankTool(LLMTool):
             raise ToolFatalError(f"初始化agent失败: {str(e)}")
 
         try:
+            llm_start = time.perf_counter()
             result = await chain.ainvoke({"input": query})
+            llm_cost_ms = (time.perf_counter() - llm_start) * 1000
 
+            postprocess_start = time.perf_counter()
             result_datasource_list = []
             filtered_out_list = []
 
@@ -529,6 +556,7 @@ class DataSourceRerankTool(LLMTool):
 
             logger.info(f"result_datasource_list: {result_datasource_list}")
             logger.info(f"filtered_out_list: {filtered_out_list}")
+            postprocess_cost_ms = (time.perf_counter() - postprocess_start) * 1000
 
             # self.session.add_agent_logs(
             #     self._result_cache_key,
@@ -563,7 +591,15 @@ class DataSourceRerankTool(LLMTool):
         # # 添加自定义规则策略信息到输出结果
         # if custom_rule_strategy_info:
         #     result["custom_rule_strategy_info"] = custom_rule_strategy_info
-        
+        total_cost_ms = (time.perf_counter() - total_start) * 1000
+        logger.info(
+            f"{from_datasource_rerank} perf | total={total_cost_ms:.2f}ms "
+            f"view_meta={view_meta_cost_ms:.2f}ms catalog_meta={catalog_meta_cost_ms:.2f}ms "
+            f"llm={llm_cost_ms:.2f}ms postprocess={postprocess_cost_ms:.2f}ms "
+            f"input_count={len(data_source_list)} view_count={len(data_view_list)} "
+            f"metric_count={len(metric_list)} catalog_count={len(data_catalog_list)} "
+            f"selected_count={len(result_datasource_list)} filtered_count={len(filtered_out_list)}"
+        )
         return result
 
 
@@ -587,9 +623,18 @@ class DataSourceRerankTool(LLMTool):
         llm_out_dict = params.get("llm", {})
         if llm_out_dict.get("name"):
             llm_dict["model_name"] = llm_out_dict.get("name")
-        llm = CustomChatOpenAI(**llm_dict)
 
         auth_dict = params.get("auth", {})
+        account_type = auth_dict.get("account_type", "user")
+        user_id = auth_dict.get("user_id", "")
+        llm_headers = {
+            "x-user": user_id,
+            "x-account-id": user_id,
+            "x-account-type": account_type
+        }
+        llm_dict["default_headers"] = llm_headers
+        llm = CustomChatOpenAI(**llm_dict)
+
         token = auth_dict.get("token", "")
         if not token or token == "''":
             user = auth_dict.get("user", "")
@@ -606,7 +651,7 @@ class DataSourceRerankTool(LLMTool):
         tool = cls(
             llm=llm,
             token=token,
-            user_id=auth_dict.get("user_id", ""),
+            user_id=user_id,
             background=config_dict.get("background", ""),
             session=session,
             with_sample=config_dict.get("with_sample", False),

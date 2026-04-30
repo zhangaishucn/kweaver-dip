@@ -5,10 +5,10 @@ import (
 	"errors"
 
 	"github.com/imroc/req/v3"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/errorcode"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/settings"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/util"
 	"github.com/kweaver-ai/idrm-go-frame/core/telemetry/log"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/errorcode"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/settings"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/util"
 	"go.uber.org/zap"
 )
 

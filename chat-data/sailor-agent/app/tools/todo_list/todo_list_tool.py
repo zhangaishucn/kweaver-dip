@@ -162,7 +162,6 @@ class TodoListTool(LLMTool):
             and all(t.get("status") == "completed" for t in tasks)
         ):
             return None
-
         return data
 
     def _save_session_tasks(self, session_id: str, task_obj: Dict[str, Any]):
@@ -236,7 +235,7 @@ class TodoListTool(LLMTool):
         *,
         force_all_pending: bool,
     ) -> List[Dict[str, Any]]:
-        """统一为 Redis 结构（含 task 字段）；generate 时子任务一律 pending。"""
+        """统一为 Redis 结构（含 task/title 字段）；generate 时子任务一律 pending。"""
         out: List[Dict[str, Any]] = []
         for t in tasks:
             try:
@@ -252,11 +251,13 @@ class TodoListTool(LLMTool):
             if isinstance(tools_used, dict):
                 tools_used = [tools_used]
             text = self._task_text_from_raw(t)
+            title = (t.get("title") or t.get("name") or "").strip() or text
             st = TaskStatus.PENDING.value if force_all_pending else (
                 t.get("status") or TaskStatus.PENDING.value
             )
             row: Dict[str, Any] = {
                 "id": tid,
+                "title": "task_{0}:{1}".format(tid, title),
                 "task": text,
                 "blockedBy": blocked_by,
                 "status": st,
@@ -280,8 +281,10 @@ class TodoListTool(LLMTool):
             if isinstance(tools_used, dict):
                 tools_used = [tools_used]
             text = self._task_text_from_raw(t)
+            title = (t.get("title") or t.get("name") or "").strip() or text
             row: Dict[str, Any] = {
                 "id": idx,
+                "title": title,
                 "task": text,
                 "blockedBy": blocked_by,
                 "status": TaskStatus.PENDING.value,
@@ -319,13 +322,14 @@ class TodoListTool(LLMTool):
                 - 当前用户问题（query_now）
                 - 问题场景（scene）
                 - 调整原因（adjustment_reason），说明为什么要改、希望如何改
-                - 历史任务列表（history_tasks），包含各任务 id、task 文本、blockedBy、status
+                - 历史任务列表（history_tasks），包含各任务 id、title、task 文本、blockedBy、status
                 - 可用工具列表（tools）
 
                 你的任务：
-                - 根据调整原因，对「尚未完成」的任务进行增删改或重排依赖；已 status 为 completed 的任务必须保持完全不变（同一 id 下 task、blockedBy、status 均不得改动）。
+                - 根据调整原因，对「尚未完成」的任务进行增删改或重排依赖；已 status 为 completed 的任务必须保持完全不变（同一 id 下 title、task、blockedBy、status 均不得改动）。
                 - 输出一份**完整**的新任务列表（包含所有已完成任务原样保留 + 调整后的未完成任务）。
                 - blockedBy 只允许引用本次输出中存在的任务 id，不得循环依赖。
+                - tasks 数组中每个任务对象必须包含 `title`（任务标题，简要概括本任务要做什么）。
 
                 顶层 JSON 结构：
                 {
@@ -335,6 +339,7 @@ class TodoListTool(LLMTool):
                   "tasks": [
                     {
                       "id": 1,
+                      "title": "任务标题",
                       "task": "任务内容",
                       "blockedBy": [],
                       "status": "pending|running|completed|failed|cancelled"
@@ -378,6 +383,7 @@ class TodoListTool(LLMTool):
                   "tasks": [
                     {
                       "id": 1,
+                      "title": "任务标题，可简要概括本任务要做什么",
                       "task": "任务内容，可注明所用工具 name 及关键输入输出",
                       "blockedBy": [],
                       "status": "pending"
@@ -390,6 +396,7 @@ class TodoListTool(LLMTool):
                 2. id 必须是从 1 开始连续递增的整数。
                 3. blockedBy 只允许引用已存在的任务 id，不能出现循环依赖。
                 4. 任务粒度要细到可以交给不同的工具或执行单元完成。
+                5. tasks 数组中每个任务对象必须包含 `title`（任务标题，简要概括本任务要做什么）。
 
                 请只返回 JSON，不要包含多余的解释文字。
                 """
@@ -835,6 +842,10 @@ class TodoListTool(LLMTool):
                                                 "type": "object",
                                                 "properties": {
                                                     "id": {"type": "integer"},
+                                                "title": {
+                                                    "type": "string",
+                                                    "description": "任务标题",
+                                                },
                                                     "task": {"type": "string"},
                                                     "tools": {
                                                         "type": "array",

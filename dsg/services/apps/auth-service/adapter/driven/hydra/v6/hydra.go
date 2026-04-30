@@ -5,13 +5,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	Ihydra "github.com/kweaver-ai/dsg/services/apps/auth-service/adapter/driven/hydra"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/settings"
-	"github.com/kweaver-ai/idrm-go-frame/core/telemetry/log"
-	"go.uber.org/zap"
 	"io"
 	"net/http"
 	"sync"
+
+	"github.com/kweaver-ai/idrm-go-frame/core/telemetry/log"
+	Ihydra "github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/adapter/driven/hydra"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/settings"
+	"go.uber.org/zap"
 
 	jsoniter "github.com/json-iterator/go"
 )

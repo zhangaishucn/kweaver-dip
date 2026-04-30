@@ -1,6 +1,6 @@
 package completion
 
-import "github.com/kweaver-ai/dsg/services/apps/auth-service/common/dto"
+import "github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/dto"
 
 // CompleteLogicViewAuthorizingRequestSpec 补全 LogicViewAuthorizingRequestSpec
 func CompleteLogicViewAuthorizingRequestSpec(spec *dto.LogicViewAuthorizingRequestSpec, requesterID string) {

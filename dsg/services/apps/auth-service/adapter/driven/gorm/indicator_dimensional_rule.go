@@ -3,14 +3,15 @@ package gorm
 import (
 	"context"
 	"errors"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/errorcode"
+
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/errorcode"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/util/sets"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/infrastructure/repository/db/model"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/util/sets"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/infrastructure/repository/db/model"
 )
 
 type IndicatorDimensionalRuleInterface interface {

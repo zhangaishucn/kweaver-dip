@@ -2,8 +2,9 @@ package impl
 
 import (
 	"context"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/enum"
+
 	"github.com/kweaver-ai/idrm-go-frame/core/telemetry/trace"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/enum"
 	"golang.org/x/exp/slices"
 )
 

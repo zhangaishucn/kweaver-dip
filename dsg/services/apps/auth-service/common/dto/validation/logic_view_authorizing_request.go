@@ -6,9 +6,9 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/dto"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/util/sets"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/util/validation/field"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/dto"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/util/sets"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/util/validation/field"
 )
 
 func ValidateLogicViewAuthorizingRequestCreate(req *dto.LogicViewAuthorizingRequest) (allErrs field.ErrorList) {

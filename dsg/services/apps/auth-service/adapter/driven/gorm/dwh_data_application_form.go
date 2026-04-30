@@ -3,16 +3,17 @@ package gorm
 import (
 	"context"
 	"errors"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/constant"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/dto"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/errorcode"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/infrastructure/repository/db/model"
+	"strings"
+
 	"github.com/kweaver-ai/idrm-go-common/util"
 	"github.com/kweaver-ai/idrm-go-common/workflow/common"
 	"github.com/kweaver-ai/idrm-go-frame/core/telemetry/log"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/constant"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/dto"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/errorcode"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/infrastructure/repository/db/model"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
-	"strings"
 )
 
 // DataAuthRequestFormRepo 定义了数据申请单的仓储接口

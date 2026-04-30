@@ -4,10 +4,10 @@
   "openclaw": {
     "skillKey": "smart-data-analysis"
   },
-  "description": "数据分析总入口编排：先做环境检测与配置检查，再按意图路由到找表（smart-search-tables）或问数（smart-ask-data）子流程；仅在问数场景按需触发 execute-code-sync/json2plot。",
+  "description": "数据分析总入口编排：先做环境检测与配置检查，再按意图路由到找表（smart-search-tables）、问数（smart-ask-data）、数据洞察（smart-data-insights，含解读/维度/对比/归因子场景）、报告（smart-reporting）子流程；execute-code-sync/json2plot 仅在 smart-data-insights 归因子场景等明确允许处按需触发。",
   "defaults": {
     "x_business_domain": "bd_public",
-    "progress_template": "[{flow}] 进度：已完成第 {step} 步（{name}）；下一步：{next}"
+    "progress_template": "## 📋 任务进度清单（阶段：{flow}）\n- [ ] 待完成 · 步骤{step}（{name}）\n- [ ] 待完成 · 下一步（{next}）"
   },
   "tools": {
     "smart_search_tables": {
@@ -17,6 +17,14 @@
     "smart_ask_data": {
       "type": "subskill",
       "reference": "skills/smart-data-analysis/references/smart-ask-data.md"
+    },
+    "smart_data_insights": {
+      "type": "subskill",
+      "reference": "skills/smart-data-analysis/references/smart-data-insights.md"
+    },    
+    "smart_reporting": {
+      "type": "subskill",
+      "reference": "skills/smart-data-analysis/references/smart-reporting.md"
     },
     "execute_code_sync": {
       "type": "subskill",
@@ -68,6 +76,20 @@
       "flow": "smart-ask-data",
       "trigger": "intent=ask_data",
       "reference": "skills/smart-data-analysis/references/smart-ask-data.md"
+    },
+    {
+      "step": 5,
+      "role": "data_insights",
+      "flow": "smart-data-insights",
+      "trigger": "intent=data_insights",
+      "reference": "skills/smart-data-analysis/references/smart-data-insights.md"
+    },
+    {
+      "step": 5,
+      "role": "generate_report",
+      "flow": "smart-reporting",
+      "trigger": "intent=reporting",
+      "reference": "skills/smart-data-analysis/references/smart-reporting.md"
     },
     {
       "step": 11,

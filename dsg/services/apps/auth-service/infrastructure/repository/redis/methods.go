@@ -45,6 +45,10 @@ func (c *Client) Set(ctx context.Context, key string, value interface{}, expirat
 	return c.client.Set(ctx, key, value, expiration).Err()
 }
 
+func (c *Client) SetWithExp(ctx context.Context, key string, value interface{}, expiration time.Duration) error {
+	return c.client.SetEx(ctx, key, value, expiration).Err()
+}
+
 func (c *Client) Get(ctx context.Context, key string) (value string, err error) {
 	err = c.client.Get(ctx, key).Scan(&value)
 	return value, err

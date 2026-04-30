@@ -3,8 +3,8 @@ package redis
 import (
 	"github.com/casbin/casbin/v2/persist"
 	rediswatcher "github.com/casbin/redis-watcher/v2"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/settings"
 	"github.com/kweaver-ai/idrm-go-frame/core/telemetry/log"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/settings"
 	"github.com/redis/go-redis/v9"
 )
 

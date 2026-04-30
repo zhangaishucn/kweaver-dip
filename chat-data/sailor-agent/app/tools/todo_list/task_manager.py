@@ -53,7 +53,7 @@ class TaskManager:
         {
           "id": 1,
           "title": "任务标题",
-          "detail": "任务详细内容",
+          "task": "任务详细内容",
           "tools": [{"name": "tool_name", "inputs": "...", "outputs": "..."}],
           "blockedBy": [],
           "status": "pending"

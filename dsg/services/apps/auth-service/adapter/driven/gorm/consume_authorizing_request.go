@@ -2,18 +2,19 @@ package gorm
 
 import (
 	"context"
-	gocommon "github.com/kweaver-ai/idrm-go-common/rest/configuration_center/impl"
 	"time"
 
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/adapter/driven/microservice"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/constant"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/dto"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/enum"
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/infrastructure/repository/db/model"
+	gocommon "github.com/kweaver-ai/idrm-go-common/rest/configuration_center/impl"
+
 	v1 "github.com/kweaver-ai/idrm-go-common/api/auth-service/v1"
 	"github.com/kweaver-ai/idrm-go-common/rest/configuration_center"
 	workflow_common "github.com/kweaver-ai/idrm-go-common/workflow/common"
 	"github.com/kweaver-ai/idrm-go-frame/core/telemetry/log"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/adapter/driven/microservice"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/constant"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/dto"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/enum"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/infrastructure/repository/db/model"
 
 	"fmt"
 	"net/http"

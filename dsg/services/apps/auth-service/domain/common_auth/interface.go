@@ -3,9 +3,9 @@ package common_auth
 import (
 	"context"
 
-	"github.com/kweaver-ai/dsg/services/apps/auth-service/common/dto"
 	auth_service_v1 "github.com/kweaver-ai/idrm-go-common/api/auth-service/v1"
 	"github.com/kweaver-ai/idrm-go-common/rest/authorization"
+	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/dto"
 )
 
 /*
@@ -36,6 +36,7 @@ type AuthManagement interface {
 type Enforcer interface {
 	Enforce(ctx context.Context, reqs dto.PolicyEnforceReq) ([]bool, error)
 	CurrentUserEnforce(ctx context.Context, req *dto.CurrentUserEnforce) (bool, error)
+	CurrentUserBatchEnforce(ctx context.Context, req *dto.CurrentUserBatchEnforce) ([]bool, error)
 	GetObjectsBySubjectId(ctx context.Context, req *dto.GetObjectsBySubjectIdReq) (res *dto.GetObjectsBySubjectIdRes, err error)
 	QueryPolicyExpiredObjects(ctx context.Context, req *dto.QueryPolicyExpiredObjectsArgs) ([]string, error)
 	CheckUserPermission(ctx context.Context, req *dto.RulePolicyEnforce) (*dto.RulePolicyEnforceEffect, error)
