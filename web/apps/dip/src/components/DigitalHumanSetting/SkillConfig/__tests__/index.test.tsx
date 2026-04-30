@@ -17,6 +17,7 @@ vi.mock('@/stores/languageStore', () => ({
 }))
 
 vi.mock('../../digitalHumanStore', () => ({
+  REMOVABLE_PRESET_SKILL_NAMES: new Set(['feishu-push']),
   useDigitalHumanStore: vi.fn(),
 }))
 
@@ -248,6 +249,7 @@ describe('DigitalHumanSetting/SkillConfig', () => {
       { name: '普通技能', built_in: false, type: 'official' },
     ] as any)
     mockedUseDigitalHumanStore.mockReturnValue({
+      uiMode: 'create',
       skills: [],
       deleteSkill: mockDeleteSkill,
       updateSkills: mockUpdateSkills,
@@ -262,5 +264,66 @@ describe('DigitalHumanSetting/SkillConfig', () => {
         { name: '内置技能', built_in: true, type: 'official' },
       ])
     })
+  })
+
+  it('创建态进入技能配置时会预置 feishu-push 且保持可移除', async () => {
+    mockedGetEnabledSkills.mockResolvedValue([
+      { name: 'archive-protocol', built_in: true, type: 'official' },
+      { name: 'feishu-push', built_in: false, type: 'official' },
+      { name: '普通技能', built_in: false, type: 'official' },
+    ] as any)
+    mockedUseDigitalHumanStore.mockReturnValue({
+      uiMode: 'create',
+      skills: [
+        {
+          name: 'feishu-push',
+          description: '推送飞书消息',
+          built_in: false,
+          type: 'official',
+        },
+      ],
+      deleteSkill: mockDeleteSkill,
+      updateSkills: mockUpdateSkills,
+      syncBuiltInSkills: mockSyncBuiltInSkills,
+      digitalHumanId: 'test-id',
+    })
+
+    render(<SkillConfig />)
+
+    await waitFor(() => {
+      expect(mockSyncBuiltInSkills).toHaveBeenCalledWith([
+        { name: 'archive-protocol', built_in: true, type: 'official' },
+        { name: 'feishu-push', built_in: false, type: 'official' },
+      ])
+    })
+
+    const buttons = screen.getAllByRole('button')
+    const deleteBtn = buttons.find((btn) => !btn.textContent?.trim())
+    if (deleteBtn === undefined) {
+      throw new Error('expected delete button')
+    }
+    expect(deleteBtn).not.toBeDisabled()
+    fireEvent.click(deleteBtn)
+    expect(mockDeleteSkill).toHaveBeenCalledWith('feishu-push')
+  })
+
+  it('编辑态进入技能配置时不会自动加载预置技能', () => {
+    mockedGetEnabledSkills.mockResolvedValue([
+      { name: 'archive-protocol', built_in: true, type: 'official' },
+      { name: 'feishu-push', built_in: false, type: 'official' },
+    ] as any)
+    mockedUseDigitalHumanStore.mockReturnValue({
+      uiMode: 'edit',
+      skills: [],
+      deleteSkill: mockDeleteSkill,
+      updateSkills: mockUpdateSkills,
+      syncBuiltInSkills: mockSyncBuiltInSkills,
+      digitalHumanId: 'test-id',
+    })
+
+    render(<SkillConfig />)
+
+    expect(mockedGetEnabledSkills).not.toHaveBeenCalled()
+    expect(mockSyncBuiltInSkills).not.toHaveBeenCalled()
   })
 })

@@ -8,7 +8,7 @@ import IconFont from '@/components/IconFont'
 import ScrollBarContainer from '@/components/ScrollBarContainer'
 import { useLanguageStore } from '@/stores/languageStore'
 import { DEFAULT_SKILL_ICON_COLORS, getMatchedColorByName } from '@/utils/handle-function'
-import { useDigitalHumanStore } from '../digitalHumanStore'
+import { REMOVABLE_PRESET_SKILL_NAMES, useDigitalHumanStore } from '../digitalHumanStore'
 import AddSkillDrawer from './AddSkillDrawer.tsx'
 import styles from './index.module.less'
 import SelectSkillModal from './SelectSkillModal'
@@ -20,7 +20,7 @@ interface SkillConfigProps {
 
 const SkillConfig = ({ readonly }: SkillConfigProps) => {
   const { language } = useLanguageStore()
-  const { skills, deleteSkill, updateSkills, syncBuiltInSkills, digitalHumanId } =
+  const { uiMode, skills, deleteSkill, updateSkills, syncBuiltInSkills, digitalHumanId } =
     useDigitalHumanStore()
   const [selectSkillModalOpen, setSelectSkillModalOpen] = useState(false)
   const [addSkillDrawerOpen, setAddSkillDrawerOpen] = useState(false)
@@ -30,7 +30,7 @@ const SkillConfig = ({ readonly }: SkillConfigProps) => {
   >(undefined)
 
   useEffect(() => {
-    if (readonly) return
+    if (readonly || uiMode !== 'create') return
 
     let cancelled = false
 
@@ -38,7 +38,11 @@ const SkillConfig = ({ readonly }: SkillConfigProps) => {
       try {
         const enabledSkills = await getEnabledSkills()
         if (cancelled) return
-        syncBuiltInSkills(enabledSkills.filter((skill) => skill.built_in))
+        syncBuiltInSkills(
+          enabledSkills.filter(
+            (skill) => skill.built_in || REMOVABLE_PRESET_SKILL_NAMES.has(skill.name),
+          ),
+        )
       } catch {
         // 内置技能默认注入失败时不阻断技能配置主流程
       }
@@ -49,7 +53,7 @@ const SkillConfig = ({ readonly }: SkillConfigProps) => {
     return () => {
       cancelled = true
     }
-  }, [readonly, syncBuiltInSkills])
+  }, [readonly, syncBuiltInSkills, uiMode])
 
   /** 添加技能 */
   const handleAddSkill = () => {

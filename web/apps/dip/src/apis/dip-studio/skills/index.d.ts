@@ -14,6 +14,7 @@ export interface DigitalHumanSkill {
   /**
    * 是否为 DIP 数字员工内置技能
    * 为 `true` 表示属于内置 trio：`archive-protocol`、`schedule-plan`、`kweaver-core`。
+   * 可移除预置技能（如 `feishu-push`）仍保持 `false`，由前端创建态默认注入。
    */
   built_in: boolean
   /**

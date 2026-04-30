@@ -90,6 +90,33 @@ describe('DigitalHumanSetting/digitalHumanStore', () => {
     expect(state.dirty).toBe(false)
   })
 
+  it('可移除预置技能被删除后不会被 syncBuiltInSkills 补回', () => {
+    const store = useDigitalHumanStore.getState()
+    store.updateSkills([{ name: 'feishu-push', built_in: false }] as any)
+
+    store.deleteSkill('feishu-push')
+    store.resetDirtyState()
+    store.syncBuiltInSkills([{ name: 'feishu-push', built_in: false }] as any)
+
+    const state = useDigitalHumanStore.getState()
+    expect(state.skills).toEqual([])
+    expect(state.removedPresetSkillNames).toEqual(['feishu-push'])
+    expect(state.dirty).toBe(false)
+  })
+
+  it('重新添加可移除预置技能后会清理移除记录', () => {
+    const store = useDigitalHumanStore.getState()
+    store.updateSkills([{ name: 'feishu-push', built_in: false }] as any)
+    store.deleteSkill('feishu-push')
+
+    store.updateSkills([{ name: 'feishu-push', built_in: false }] as any)
+
+    const state = useDigitalHumanStore.getState()
+    expect(state.skills).toEqual([{ name: 'feishu-push', built_in: false }])
+    expect(state.removedPresetSkillNames).toEqual([])
+    expect(state.dirty).toBe(true)
+  })
+
   it('resetAllToDetail 会回滚到 detail 快照并清理 dirty', () => {
     const detail = {
       id: 'dh-2',

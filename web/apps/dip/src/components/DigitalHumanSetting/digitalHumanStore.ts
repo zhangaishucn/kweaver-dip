@@ -13,6 +13,11 @@ export type DigitalHumanBasic = Pick<DigitalHumanDetail, 'name' | 'creature' | '
 
 export type { BknEntry, ChannelConfig } from '@/apis'
 
+export const REMOVABLE_PRESET_SKILL_NAMES = new Set(['feishu-push'])
+
+const isRemovablePresetSkillName = (skillName: string) =>
+  REMOVABLE_PRESET_SKILL_NAMES.has(skillName)
+
 export interface DigitalHumanState {
   /** 当前页面编辑状态：新建/编辑/详情 */
   uiMode: DigitalHumanUiMode
@@ -31,6 +36,9 @@ export interface DigitalHumanState {
 
   /** 技能列表（用于渲染与编辑） */
   skills: DigitalHumanSkill[]
+
+  /** 用户已主动移除的可移除预置技能名称 */
+  removedPresetSkillNames: string[]
 
   /** 已绑定的渠道凭证（对齐 DigitalHumanExtension.channel，单通道） */
   channel?: ChannelConfig
@@ -66,8 +74,8 @@ export interface DigitalHumanState {
   deleteBkn: (url: string) => void
   /** 更新技能目录名列表（整组替换） */
   updateSkills: (patches: DigitalHumanSkill[]) => void
-  /** 合并内置技能到当前配置和详情快照，不标记 dirty */
-  syncBuiltInSkills: (builtInSkills: DigitalHumanSkill[]) => void
+  /** 合并默认预置技能到当前配置和详情快照，不标记 dirty */
+  syncBuiltInSkills: (presetSkills: DigitalHumanSkill[]) => void
   /** 删除单个技能（按目录名） */
   deleteSkill: (skillDirectoryName: string) => void
   /** 更新渠道配置 */
@@ -105,6 +113,7 @@ export const useDigitalHumanStore = create<DigitalHumanState>()((set) => ({
   basic: defaultBasic,
   bkn: defaultBkn,
   skills: defaultSkills,
+  removedPresetSkillNames: [],
   channel: undefined,
   detail: null,
   dirty: false,
@@ -126,6 +135,7 @@ export const useDigitalHumanStore = create<DigitalHumanState>()((set) => ({
         basic: defaultBasic,
         bkn: defaultBkn,
         skills: defaultSkills,
+        removedPresetSkillNames: [],
         channel: undefined,
         dirty: false,
         detail: null,
@@ -146,6 +156,7 @@ export const useDigitalHumanStore = create<DigitalHumanState>()((set) => ({
         },
         bkn: digitalHuman.bkn ?? defaultBkn,
         skills: nextSkills,
+        removedPresetSkillNames: [],
         channel: digitalHuman.channel,
         // detail 快照用于 resetAllToDetail：skills 则应始终是 UI 可用的对象列表
         detail: {
@@ -184,17 +195,38 @@ export const useDigitalHumanStore = create<DigitalHumanState>()((set) => ({
     })),
 
   updateSkills: (patches) =>
-    set(() => ({
-      skills: patches,
-      dirty: true,
-    })),
-
-  syncBuiltInSkills: (builtInSkills) =>
     set((state) => {
-      const nextSkills = mergeSkillsByName(state.skills, builtInSkills)
+      const selectedSkillNames = new Set(patches.map((skill) => skill.name))
+      const removedPresetSkillNames = new Set(state.removedPresetSkillNames)
+
+      for (const skillName of REMOVABLE_PRESET_SKILL_NAMES) {
+        if (selectedSkillNames.has(skillName)) {
+          removedPresetSkillNames.delete(skillName)
+          continue
+        }
+
+        if (state.skills.some((skill) => skill.name === skillName)) {
+          removedPresetSkillNames.add(skillName)
+        }
+      }
+
+      return {
+        skills: patches,
+        removedPresetSkillNames: Array.from(removedPresetSkillNames),
+        dirty: true,
+      }
+    }),
+
+  syncBuiltInSkills: (presetSkills) =>
+    set((state) => {
+      const removedPresetSkillNames = new Set(state.removedPresetSkillNames)
+      const syncablePresetSkills = presetSkills.filter(
+        (skill) => skill.built_in || !removedPresetSkillNames.has(skill.name),
+      )
+      const nextSkills = mergeSkillsByName(state.skills, syncablePresetSkills)
       const nextDetailSkills = mergeSkillsByName(
         state.detail?.skills ?? defaultSkills,
-        builtInSkills,
+        syncablePresetSkills,
       )
 
       if (
@@ -218,6 +250,9 @@ export const useDigitalHumanStore = create<DigitalHumanState>()((set) => ({
   deleteSkill: (skillName) =>
     set((state) => ({
       skills: state.skills.filter((s) => s.name !== skillName),
+      removedPresetSkillNames: isRemovablePresetSkillName(skillName)
+        ? Array.from(new Set([...state.removedPresetSkillNames, skillName]))
+        : state.removedPresetSkillNames,
       dirty: true,
     })),
 
@@ -242,6 +277,7 @@ export const useDigitalHumanStore = create<DigitalHumanState>()((set) => ({
       },
       bkn: state.detail?.bkn ?? defaultBkn,
       skills: state.detail?.skills ?? defaultSkills,
+      removedPresetSkillNames: [],
       channel: state.detail?.channel ?? undefined,
       dirty: false,
     })),
@@ -252,6 +288,7 @@ export const useDigitalHumanStore = create<DigitalHumanState>()((set) => ({
       basic: defaultBasic,
       bkn: defaultBkn,
       skills: defaultSkills,
+      removedPresetSkillNames: [],
       channel: undefined,
       dirty: false,
       detail: null,
