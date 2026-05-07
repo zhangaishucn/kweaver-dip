@@ -875,6 +875,8 @@ DIP 数字员工 Web 界面
 | icon_id | string | 否 | 图标 ID |
 | soul | string | 否 | `SOUL.md` 内容 |
 | skills | string[] | 否 | 创建时要追加绑定的技能名称列表；后端会始终先绑定内置技能 `archive-protocol`、`schedule-plan`、`kweaver-core`，再追加该列表；重复值会按首次出现顺序去重。响应中 `skills` 为实际绑定的技能 id 列表 |
+| bkn | BknEntry[] | 否 | 业务知识网络条目；写入 `SOUL.md`，供数字员工运行时限制可用业务知识网络 |
+| kweaver_token | string | 否 | KWeaver 应用账号 Token，最长 255 字符；传入非空字符串时写入 `t_digital_employee.kweaver_token`；不会在响应或详情中回显 |
 | channel | ChannelConfig | 否 | 渠道配置；后端会通过 OpenClaw Gateway WebSocket RPC `config.get` 读取 parsed `config` 对象，更新后转为 `raw`，并通过 `config.set` 写回完整配置，不直接写入本机 `openclaw.json`，避免 `config.patch` / `config.apply` 触发网关重启；若同类型渠道中 AppID 已配置则返回 400 |
 
 响应：`201 application/json`
@@ -882,6 +884,27 @@ DIP 数字员工 Web 界面
 | 参数 | 类型 | 说明 |
 | -- | -- | -- |
 | id | string | 数字员工 ID |
+
+#### 编辑数字员工
+
+`PUT /api/dip-studio/v1/digital-human/{id}`
+
+请求：`application/json`
+
+至少提供以下字段之一：`name`、`creature`、`icon_id`、`soul`、`skills`、`bkn`、`kweaver_token`、`channel`。
+
+| 参数 | 类型 | 是否必填 | 说明 |
+| -- | -- | -- | -- |
+| name | string | 否 | 数字员工名称 |
+| creature | string | 否 | 数字员工岗位/角色 |
+| icon_id | string | 否 | 图标 ID |
+| soul | string | 否 | `SOUL.md` 内容 |
+| skills | string[] | 否 | 当前完整技能列表；出现时整组替换 |
+| bkn | BknEntry[] | 否 | 当前完整业务知识网络条目；出现时整组替换 |
+| kweaver_token | string \| null | 否 | 非空字符串会写入/替换 `t_digital_employee.kweaver_token`；`null` 或空字符串会删除该 Token，并同步清空 `bkn` |
+| channel | ChannelConfig | 否 | 渠道配置，语义同创建接口 |
+
+响应：`200 application/json`，结构与创建响应一致，但不回显 `kweaver_token`。
 
 #### 创建会话键
 

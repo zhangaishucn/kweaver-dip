@@ -1,12 +1,5 @@
 # 创建新的数字员工
 
-## 术语
-
-**ISF**
-
-Information Security Fabric：是 DIP 底层的数据安全模块，提供用户管理、应用账号管理、OAuth 认证、权限管控等能力。
-
-
 ## 业务流程
 
 ### 创建数字员工 Logic
@@ -86,7 +79,7 @@ SW ->> ISF: 获取应用账号 Token
 
 ##### 写入 KWeaver Token
 
-创建数字员工时，将 KWeaver Token 值写入 `~/.openclaw/workspace/<agentId>/SECRET` 文件，内容为：`KWEAVER_TOEN={KWeaver Token}`
+创建数字员工时，将 KWeaver Token 值写入 t_digital_employee 表，表结构参考：@design/data-model/studio/data-model.md
 
 ### 通过接口创建数字员工
 提供 HTTP 接口来创建数字员工。

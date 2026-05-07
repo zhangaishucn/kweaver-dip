@@ -9,17 +9,21 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "dev": "tsx watch src/server.ts",
+    "dev:mcp": "tsx watch src/mcp-server.ts",
     "init:agents": "node scripts/init_agents/index.mjs",
+    "mcp": "node dist/mcp-server.js",
     "start": "node dist/server.js",
     "test": "vitest run --coverage",
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@kweaver-ai/kweaver-sdk": "^0.7.1",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "dotenv": "^17.2.2",
     "express": "^5.1.0",
     "multer": "^2.1.1",
-    "openclaw": "2026.3.11",
-    "@kweaver-ai/kweaver-sdk": "^0.7.1"
+    "mysql2": "^3.22.3",
+    "openclaw": "2026.3.11"
   },
   "devDependencies": {
     "@types/express": "^5.0.3",

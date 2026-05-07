@@ -3,6 +3,8 @@ import { join } from "node:path";
 
 import { config as loadDotEnvConfig } from "dotenv";
 
+import type { StudioDatabaseConfig } from "../infra/mariadb-client";
+
 let hasLoadedDotEnv = false;
 
 /**
@@ -112,6 +114,45 @@ export function getEnv(): {
     openClawGatewayToken: readOptionalString(process.env.OPENCLAW_GATEWAY_TOKEN),
     openClawGatewayTimeoutMs: resolveTimeoutMs(process.env.OPENCLAW_GATEWAY_TIMEOUT_MS),
     openClawWorkspaceDir: resolveWorkspaceDir()
+  };
+}
+
+/**
+ * Reads and validates Studio MCP Server runtime settings.
+ *
+ * @returns The normalized MCP host and port.
+ */
+export function getMcpEnv(): {
+  host: string;
+  port: number;
+} {
+  loadEnvFile();
+
+  return {
+    host: readOptionalString(process.env.MCP_HOST) ?? "127.0.0.1",
+    port: resolvePositiveInteger(process.env.MCP_PORT, 3001, "MCP_PORT")
+  };
+}
+
+/**
+ * Reads and validates Studio MariaDB connection settings.
+ *
+ * @returns The normalized Studio database configuration.
+ */
+export function getStudioDatabaseConfig(): StudioDatabaseConfig {
+  loadEnvFile();
+
+  return {
+    host: readOptionalString(process.env.DB_HOST) ?? "127.0.0.1",
+    port: resolvePositiveInteger(process.env.DB_PORT, 3306, "DB_PORT"),
+    user: readOptionalString(process.env.DB_USER) ?? "root",
+    password: readOptionalString(process.env.DB_PASSWORD),
+    database: readOptionalString(process.env.DB_NAME) ?? "kweaver",
+    connectionLimit: resolvePositiveInteger(
+      process.env.DB_CONNECTION_LIMIT,
+      10,
+      "DB_CONNECTION_LIMIT"
+    )
   };
 }
 
@@ -266,6 +307,33 @@ export function resolveTimeoutMs(value: string | undefined): number {
   }
 
   return timeoutMs;
+}
+
+/**
+ * Resolves a positive integer from an optional environment variable.
+ *
+ * @param value The raw environment variable value.
+ * @param defaultValue Value returned when the raw value is empty.
+ * @param variableName Environment variable name used in error messages.
+ * @returns A positive integer.
+ * @throws {Error} Thrown when the value is not a positive integer.
+ */
+export function resolvePositiveInteger(
+  value: string | undefined,
+  defaultValue: number,
+  variableName: string
+): number {
+  if (value === undefined || value.trim() === "") {
+    return defaultValue;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new Error(`Invalid ${variableName} value: ${value}`);
+  }
+
+  return parsed;
 }
 
 /**

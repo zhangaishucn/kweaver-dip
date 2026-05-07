@@ -7,11 +7,14 @@ import { describe, expect, it } from "vitest";
 import {
   asMessage,
   getOpenClawGatewayRuntimeConfig,
+  getMcpEnv,
+  getStudioDatabaseConfig,
   isDevelopmentMode,
   loadEnvFile,
   readOptionalString,
   resolveBknBackendUrl,
-  resolveHydraAdminUrl
+  resolveHydraAdminUrl,
+  resolvePositiveInteger
 } from "./env";
 
 describe("env helpers", () => {
@@ -42,6 +45,14 @@ describe("env helpers", () => {
     expect(isDevelopmentMode("development")).toBe(true);
     expect(isDevelopmentMode("test")).toBe(false);
     expect(isDevelopmentMode(undefined)).toBe(false);
+  });
+
+  it("resolves positive integers", () => {
+    expect(resolvePositiveInteger(undefined, 10, "TEST_VALUE")).toBe(10);
+    expect(resolvePositiveInteger("12", 10, "TEST_VALUE")).toBe(12);
+    expect(() => resolvePositiveInteger("0", 10, "TEST_VALUE")).toThrow(
+      "Invalid TEST_VALUE value: 0"
+    );
   });
 
   it("reloads the latest OpenClaw gateway config from a specific env file", () => {
@@ -102,6 +113,92 @@ describe("env helpers", () => {
       } else {
         process.env.DIP_STUDIO_CWD_ENV_TEST = previousValue;
       }
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("loads MCP settings from the service environment", () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "dip-studio-mcp-env-"));
+    const envPath = join(tempDir, ".env");
+
+    writeFileSync(envPath, ["MCP_HOST=0.0.0.0", "MCP_PORT=39001"].join("\n"), "utf8");
+
+    try {
+      loadEnvFile({
+        path: envPath,
+        override: true,
+        forceReload: true
+      });
+
+      expect(getMcpEnv()).toEqual({
+        host: "0.0.0.0",
+        port: 39001
+      });
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("uses local MCP defaults", () => {
+    const previousHost = process.env.MCP_HOST;
+    const previousPort = process.env.MCP_PORT;
+
+    try {
+      delete process.env.MCP_HOST;
+      delete process.env.MCP_PORT;
+
+      expect(getMcpEnv()).toEqual({
+        host: "127.0.0.1",
+        port: 3001
+      });
+    } finally {
+      if (previousHost === undefined) {
+        delete process.env.MCP_HOST;
+      } else {
+        process.env.MCP_HOST = previousHost;
+      }
+
+      if (previousPort === undefined) {
+        delete process.env.MCP_PORT;
+      } else {
+        process.env.MCP_PORT = previousPort;
+      }
+    }
+  });
+
+  it("loads Studio database settings from the service environment", () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "dip-studio-db-env-"));
+    const envPath = join(tempDir, ".env");
+
+    writeFileSync(
+      envPath,
+      [
+        "DB_HOST=db.example.com",
+        "DB_PORT=3307",
+        "DB_USER=studio",
+        "DB_PASSWORD=secret",
+        "DB_NAME=kweaver_test",
+        "DB_CONNECTION_LIMIT=3"
+      ].join("\n"),
+      "utf8"
+    );
+
+    try {
+      loadEnvFile({
+        path: envPath,
+        override: true,
+        forceReload: true
+      });
+
+      expect(getStudioDatabaseConfig()).toEqual({
+        host: "db.example.com",
+        port: 3307,
+        user: "studio",
+        password: "secret",
+        database: "kweaver_test",
+        connectionLimit: 3
+      });
+    } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }
   });
