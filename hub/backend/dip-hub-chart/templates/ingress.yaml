@@ -6,6 +6,7 @@ metadata:
   annotations:
     nginx.ingress.kubernetes.io/enable-cors: "true"
     nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+    nginx.ingress.kubernetes.io/app-root: /dip-hub
 spec:
   ingressClassName: {{ index .Values.depServices "class-443" "ingressClass" }}
   rules:
