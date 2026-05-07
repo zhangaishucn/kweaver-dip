@@ -364,41 +364,52 @@ DIP 数字员工 Web 界面
 
 错误响应：`400`、`500`、`502`
 
-#### 获取当前用户 pinned 数字员工偏好
+#### 获取侧栏钉选数字员工列表（需求：账号级侧栏快捷列表）
 
-`GET /api/dip-studio/v1/user/preferences`
+`GET /api/dip-studio/v1/pinned-digital-humans`
 
 响应：`200 application/json`
 
+服务端根据库中 `pinned_digital_human_ids` 与各数字员工档案**组合**展示字段；**无法解析**（已删除等）的 id 不会出现在响应中，并在发现与存储不一致时**回写**修剪后的 id 数组。前端侧栏应直接消费本接口，避免再用「钉选 id + `GET /digital-human`」拼装。
+
 | 参数 | 类型 | 说明 |
 | -- | -- | -- |
-| pinned_digital_human_ids | string[] | 当前用户侧栏固定的数字员工 ID 列表，顺序即展示顺序 |
+| pinned_digital_humans | SidebarPinnedDigitalHuman[] | 钉选行列表，`[0]` 为最近钉选（自上而下）；**仅含**服务端仍能解析的数字员工（已删除项已被过滤）。 |
 
-该接口归属 Studio 域：偏好内容直接服务数字员工切换与会话入口，底层写入 Studio 专属的 `t_studio_user_preference` 表，对外接口统一落在 `/api/dip-studio/v1/`。
+该接口归属 Studio 域：持久化仍为表 `t_studio_user_preference` 的 `pinned_digital_human_ids` 列（每用户一行，无其它 JSON 偏好列）。
 
-#### 更新当前用户 pinned 数字员工偏好
+#### 钉选或置顶一个数字员工
 
-`PUT /api/dip-studio/v1/user/preferences`
+`POST /api/dip-studio/v1/pinned-digital-humans`
+
+请求体**仅需一个** `pinned_digital_human_id`。服务端将该 id **插入或移动到**钉选列表**最前**（与 §1.5「最近在上」一致）；若当前已有 8 个**不同** id 且本次为**新增第 9 个**，返回 `400`。钉选前会校验档案可解析（不可解析时返回错误，不写库）。
 
 请求体示例：
 
 ```json
 {
-  "pinned_digital_human_ids": ["dh-1", "dh-2"]
+  "pinned_digital_human_id": "dh-1"
 }
 ```
 
-请求体参数：
-
 | 参数 | 类型 | 是否必填 | 说明 |
 | -- | -- | -- | -- |
-| pinned_digital_human_ids | string[] | 是 | 当前用户侧栏固定的数字员工 ID 列表，顺序即展示顺序 |
+| pinned_digital_human_id | string | 是 | 要钉选或置顶的数字员工 id |
 
-约束：
+成功响应：`200`，Body 与 `GET` 相同（更新后的完整 `pinned_digital_humans` 快照）；存储端仍会按可解析结果修剪无效 id。
 
-- 最多固定 `8` 个数字员工。
-- 服务端会按首次出现顺序去重，并 trim 首尾空白。
-- 仅覆盖 `t_studio_user_preference.content` 中的 `pinned_digital_human_ids` 字段，不会清空其它未知偏好键。
+#### 取消钉选一个数字员工
+
+`DELETE /api/dip-studio/v1/pinned-digital-humans/{pinnedDigitalHumanId}`
+
+路径参数 `{pinnedDigitalHumanId}` 为数字员工 id（需 URL 编码）。若该 id 未钉选，**幂等**，仍返回当前完整快照。
+
+成功响应：`200`，Body 与 `GET` 相同。
+
+#### 钉选存储说明
+
+- 最多固定 `8` 个**不同**数字员工（钉选语义见上）。
+- 持久化仅包含 `user_id`、`pinned_digital_human_ids`、`updated_at` 三列；`GET` 也会在发现脏 id 时修剪存储。
 
 #### 获取会话列表
 

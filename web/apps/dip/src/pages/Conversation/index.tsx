@@ -1,10 +1,13 @@
-import { memo, useCallback, useEffect, useMemo, useRef } from 'react'
+import { memo, useCallback, useEffect, useMemo } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import DipChatKit from '@/components/DipChatKit'
+import { parseAgentIdFromSessionKey } from '@/components/DipChatKit/utils'
 import useSyncHistorySessions from '@/hooks/useSyncHistorySessions'
 import type { ConversationRouteState } from './types'
 
 const SUBMIT_CONSUMED_PREFIX = 'dip-chatkit-submit-consumed'
+
+const EMPTY_ROUTE_STATE: ConversationRouteState & Record<string, unknown> = {}
 
 const Conversation = () => {
   useSyncHistorySessions()
@@ -12,13 +15,17 @@ const Conversation = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
-  const employeeFromQuery = searchParams.get('employee')
+  const employeeFromQuery = searchParams.get('employee')?.trim() || ''
   const sessionKeyFromQuery = searchParams.get('sessionKey')?.trim() || ''
-  const routeState = (location.state || {}) as ConversationRouteState & Record<string, unknown>
+  /** 无 state 时用模块级常量，避免每次渲染新对象导致依赖 routeState 的 effect 无限触发 */
+  const routeState = (
+    location.state ? (location.state as ConversationRouteState & Record<string, unknown>) : EMPTY_ROUTE_STATE
+  )
   const submitData = routeState.submitData
   const submitToken = routeState.submitToken?.trim() || ''
   const consumedStorageKey = submitToken ? `${SUBMIT_CONSUMED_PREFIX}:${submitToken}` : ''
-  const initialSessionKeyRef = useRef(sessionKeyFromQuery)
+
+  const activeSessionIdProp = sessionKeyFromQuery || undefined
 
   const initialSubmitPayload = useMemo(() => {
     if (!submitData) return undefined
@@ -34,6 +41,28 @@ const Conversation = () => {
     return submitData?.employees?.[0]?.value
   }, [employeeFromQuery, submitData])
 
+  /**
+   * URL 中 employee 与 sessionKey 内含 agent 不一致时移除 sessionKey，
+   * 避免切换数字员工后仍挂载旧线程（与侧栏钉选「新开对话」语义对齐）。
+   */
+  useEffect(() => {
+    if (!employeeFromQuery || !sessionKeyFromQuery) return
+
+    const agentFromSession = parseAgentIdFromSessionKey(sessionKeyFromQuery)
+    if (!agentFromSession || agentFromSession === employeeFromQuery) return
+
+    const nextSearchParams = new URLSearchParams(location.search)
+    nextSearchParams.delete('sessionKey')
+    const nextSearch = nextSearchParams.toString()
+    navigate(
+      {
+        pathname: location.pathname,
+        search: nextSearch ? `?${nextSearch}` : '',
+      },
+      { replace: true, state: location.state ?? null },
+    )
+  }, [employeeFromQuery, location.pathname, location.search, location.state, navigate, sessionKeyFromQuery])
+
   useEffect(() => {
     if (!initialSubmitPayload) return
 
@@ -42,7 +71,9 @@ const Conversation = () => {
     }
 
     if (!(submitData || submitToken)) return
-    const nextState: Record<string, unknown> = { ...routeState }
+    const prevState =
+      location.state != null ? (location.state as Record<string, unknown>) : EMPTY_ROUTE_STATE
+    const nextState: Record<string, unknown> = { ...prevState }
     delete nextState.submitData
     delete nextState.submitToken
     navigate(
@@ -60,8 +91,8 @@ const Conversation = () => {
     initialSubmitPayload,
     location.pathname,
     location.search,
+    location.state,
     navigate,
-    routeState,
     submitData,
     submitToken,
   ])
@@ -80,11 +111,11 @@ const Conversation = () => {
         },
         {
           replace: true,
-          state: routeState,
+          state: location.state ?? null,
         },
       )
     },
-    [location.pathname, location.search, navigate, routeState, sessionKeyFromQuery],
+    [location.pathname, location.search, location.state, navigate, sessionKeyFromQuery],
   )
 
   return (
@@ -92,7 +123,7 @@ const Conversation = () => {
       <div className="h-full min-h-0">
         <DipChatKit
           initialSubmitPayload={initialSubmitPayload}
-          sessionId={initialSessionKeyRef.current || undefined}
+          sessionId={activeSessionIdProp}
           assignEmployeeValue={defaultEmployeeValue}
           onSessionKeyReady={handleSessionKeyReady}
         />

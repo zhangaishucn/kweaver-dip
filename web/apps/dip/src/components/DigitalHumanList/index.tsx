@@ -1,4 +1,5 @@
-import { Col, type MenuProps, Row } from 'antd'
+import { Col, Row } from 'antd'
+import type { ReactNode } from 'react'
 import { memo, useCallback } from 'react'
 import AutoSizer from 'react-virtualized-auto-sizer'
 import type { DigitalHuman } from '@/apis'
@@ -11,8 +12,8 @@ interface DigitalHumanListProps {
   digitalHumans: DigitalHuman[]
   /** 卡片点击回调 */
   onCardClick?: (digitalHuman: DigitalHuman) => void
-  /** 卡片菜单点击回调 */
-  menuItems?: (digitalHuman: DigitalHuman) => MenuProps['items']
+  /** 卡片右上角自定义区域（由父组件渲染，如钉选按钮） */
+  cardTrailing?: (digitalHuman: DigitalHuman) => ReactNode
 }
 
 /**
@@ -21,7 +22,7 @@ interface DigitalHumanListProps {
 const DigitalHumanList: React.FC<DigitalHumanListProps> = ({
   digitalHumans,
   onCardClick,
-  menuItems,
+  cardTrailing,
 }) => {
   /** 渲染卡片 */
   const renderCard = useCallback(
@@ -31,13 +32,13 @@ const DigitalHumanList: React.FC<DigitalHumanListProps> = ({
           <EmployeeCard
             digitalHuman={digitalHuman}
             width={width}
-            menuItems={menuItems?.(digitalHuman)}
+            cardTrailing={cardTrailing?.(digitalHuman)}
             onCardClick={(digitalHuman) => onCardClick?.(digitalHuman)}
           />
         </Col>
       )
     },
-    [onCardClick],
+    [onCardClick, cardTrailing],
   )
 
   return (

@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { getFullPath } from '@/utils/config'
 import { getAccessToken, setAccessToken } from '@/utils/http/token-config'
-import { usePreferenceStore, useUserInfoStore } from '../stores'
+import { usePreferenceStore, usePinnedDigitalHumansStore, useUserInfoStore } from '../stores'
 
 interface ProtectedRouteProps {
   children: React.ReactNode
@@ -24,7 +24,7 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   // 用于跟踪上次的 token，当 token 变化时重置 hasTriedFetchRef，允许重新请求
   // 注意：虽然 useEffect 依赖 token，但 ref 不会自动重置，需要手动检测变化
   const lastTokenRef = useRef<string | null>(null)
-  /** 当前 token 是否已触发过 pinned 列表拉取（避免路由切换重复请求） */
+  /** 当前 token 是否已触发过钉住微应用预拉取（避免路由切换重复请求） */
   const pinnedFetchedForTokenRef = useRef<string | null>(null)
 
   // 通过环境变量控制是否跳过登录认证
@@ -132,13 +132,14 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, isLoginPage, fetchUserInfo, skipAuth])
 
-  // 用户已登录且具备用户信息时，每个登录会话（token）内只拉取一次 pinned 列表；路由切换、窗口聚焦不再触发
+  // 用户已登录且具备用户信息时，每个登录会话（token）内只拉取一次钉住微应用；侧栏「常用数字员工」在 HomeSider/AdminSider 挂载时拉取（含 PUBLIC_SKIP_AUTH）
   useEffect(() => {
     if (skipAuth) {
       return
     }
     if (!token) {
       pinnedFetchedForTokenRef.current = null
+      usePinnedDigitalHumansStore.getState().resetPinnedDigitalHumans()
       return
     }
     if (!userInfo) {
@@ -148,10 +149,14 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
       return
     }
     pinnedFetchedForTokenRef.current = token
+    const tasks: Promise<void>[] = []
     if (modules.includes('store')) {
-      void fetchPinnedMicroApps()
+      tasks.push(fetchPinnedMicroApps())
     }
-  }, [skipAuth, token, userInfo, fetchPinnedMicroApps])
+    if (tasks.length > 0) {
+      void Promise.all(tasks)
+    }
+  }, [skipAuth, token, userInfo, fetchPinnedMicroApps, modules])
 
   // 如果跳过认证，直接返回子组件
   if (skipAuth) {

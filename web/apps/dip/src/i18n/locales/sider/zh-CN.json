@@ -34,6 +34,17 @@
       "more": "更多",
       "empty": "暂无历史记录",
       "deleteAria": "删除历史会话"
+    },
+    "pinnedDigitalHumans": {
+      "sectionTitle": "常用数字员工（{count}）",
+      "sectionAria": "侧栏常用数字员工",
+      "unpin": "取消固定",
+      "unpinAria": "{name}：更多操作",
+      "pinSuccess": "已固定到侧栏",
+      "unpinSuccess": "已取消侧栏固定",
+      "pinLimitReached": "侧栏最多可固定 {max} 个数字员工，请先取消部分固定后再添加。",
+      "moreCollapsed": "更多（{count}）",
+      "morePopoverAria": "展开查看其余常用数字员工"
     }
   }
 }

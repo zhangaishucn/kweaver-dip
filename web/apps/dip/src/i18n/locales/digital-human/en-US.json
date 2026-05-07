@@ -19,6 +19,8 @@
       "menuEdit": "Edit",
       "menuSession": "Session",
       "menuDelete": "Delete",
+      "menuPinSidebar": "Pin to sidebar",
+      "menuUnpinSidebar": "Unpin from sidebar",
       "deleteModalTitle": "Delete digital employee",
       "deleteConfirmBody": "Delete digital employee __DH_NAME__? All data under this employee will be permanently deleted. This action cannot be undone.",
       "deleteOk": "Delete",

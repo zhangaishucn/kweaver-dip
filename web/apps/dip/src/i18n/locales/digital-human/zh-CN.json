@@ -19,6 +19,8 @@
       "menuEdit": "编辑",
       "menuSession": "会话",
       "menuDelete": "删除",
+      "menuPinSidebar": "固定到侧栏",
+      "menuUnpinSidebar": "取消侧栏固定",
       "deleteModalTitle": "确认删除数字员工",
       "deleteConfirmBody": "您确认要删除数字员工 __DH_NAME__ 吗？删除后，该数字员工下的所有数据将被永久删除，此操作无法撤销。",
       "deleteOk": "删除",

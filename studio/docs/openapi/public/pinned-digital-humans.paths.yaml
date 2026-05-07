@@ -1,0 +1,122 @@
+openapi: 3.1.0
+
+info:
+  title: DIP Studio 侧栏钉选数字员工
+  version: 0.3.0
+  description: |
+    需求：用户在 Studio 侧栏固定常用数字员工并一键切换（kweaver-dip#167）。
+    HTTP 资源语义为「当前用户的侧栏钉选列表」，而非泛化的全部用户偏好集合。
+
+tags:
+  - name: SidebarPinnedDigitalHumans
+    description: |
+      侧栏「我的钉选数字员工」有序列表（需求 1.3-1～1.3-5：可固定、可展示、可切换入口数据、可取消固定、账号级持久化）。
+      业务规则见：幂等钉选、至多 8 项、自上而下为按添加时间倒序（最近添加在最上）、
+      **GET/POST/DELETE 响应由服务端组合** name/icon 等展示字段（`pinned_digital_humans`）；无法解析的钉选 id 在组合时被剔除，
+      并写回修剪后的 `pinned_digital_human_ids`。`POST` 一次仅提交**一个** id 进行钉选/置顶；`DELETE .../{id}` 取消钉选。
+
+security: []
+
+servers:
+  - url: /api/dip-studio/v1
+
+paths:
+  /pinned-digital-humans:
+    get:
+      operationId: getSidebarPinnedDigitalHumans
+      summary: 获取侧栏钉选数字员工列表
+      description: |
+        读取当前登录用户在侧栏固定的数字员工；响应由服务端根据持久化 id 与数字员工档案**组合**，
+        且**不包含**已删除或不可加载的项（无效 id 会在服务端被过滤，并视情况回写修剪后的存储）。
+        `pinned_digital_humans[0]` 为最近钉选；无有效项时为空数组。
+        需求对应：1.3-2（展示数据）、1.3-5（多端一致前提下的读取）。
+      tags:
+        - SidebarPinnedDigitalHumans
+      responses:
+        "200":
+          description: 当前侧栏钉选快照（含顺序）
+          content:
+            application/json:
+              schema:
+                $ref: './pinned-digital-humans.schemas.yaml#/components/schemas/SidebarPinnedDigitalHumansState'
+        "400":
+          $ref: '../common.schemas.yaml#/errors/InvalidParameter'
+        "401":
+          $ref: '../common.schemas.yaml#/errors/Unauthorized'
+        "403":
+          $ref: '../common.schemas.yaml#/errors/Forbidden'
+        "404":
+          $ref: '../common.schemas.yaml#/errors/NotFound'
+        "409":
+          $ref: '../common.schemas.yaml#/errors/Conflict'
+        "500":
+          $ref: '../common.schemas.yaml#/errors/InternalServerError'
+
+    post:
+      operationId: postSidebarPinnedDigitalHumans
+      summary: 钉选一个数字员工（或将其置顶）
+      description: |
+        请求体仅含**一个** `pinned_digital_human_id`。服务端将该 id 插入/移动到钉选列表**最前**（最近钉选），
+        与 §1.5 倒序一致；已钉选过的 id 会先去掉旧位置再放到首部（幂等）。
+        若当前已有 **8** 个**不同** id 且本请求为**新增第 9 个**，返回 400。
+        成功响应为更新后的 `pinned_digital_humans` 快照（组合档案且已过滤无效 id）；客户端用响应覆盖本地缓存。
+      tags:
+        - SidebarPinnedDigitalHumans
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './pinned-digital-humans.schemas.yaml#/components/schemas/PostSidebarPinnedDigitalHumansRequest'
+      responses:
+        "200":
+          description: 更新后的侧栏钉选快照
+          content:
+            application/json:
+              schema:
+                $ref: './pinned-digital-humans.schemas.yaml#/components/schemas/SidebarPinnedDigitalHumansState'
+        "400":
+          $ref: '../common.schemas.yaml#/errors/InvalidParameter'
+        "401":
+          $ref: '../common.schemas.yaml#/errors/Unauthorized'
+        "403":
+          $ref: '../common.schemas.yaml#/errors/Forbidden'
+        "404":
+          $ref: '../common.schemas.yaml#/errors/NotFound'
+        "409":
+          $ref: '../common.schemas.yaml#/errors/Conflict'
+        "500":
+          $ref: '../common.schemas.yaml#/errors/InternalServerError'
+
+  /pinned-digital-humans/{pinnedDigitalHumanId}:
+    delete:
+      operationId: deleteSidebarPinnedDigitalHuman
+      summary: 取消钉选一个数字员工
+      description: |
+        从钉选列表中移除路径参数指定的 id（若未钉选则幂等，仍返回当前完整快照）。
+        成功响应为更新后的 `pinned_digital_humans`。
+      tags:
+        - SidebarPinnedDigitalHumans
+      parameters:
+        - name: pinnedDigitalHumanId
+          in: path
+          required: true
+          description: 要取消钉选的数字员工 id（URL 编码）
+          schema:
+            type: string
+            maxLength: 128
+      responses:
+        "200":
+          description: 更新后的侧栏钉选快照
+          content:
+            application/json:
+              schema:
+                $ref: './pinned-digital-humans.schemas.yaml#/components/schemas/SidebarPinnedDigitalHumansState'
+        "400":
+          $ref: '../common.schemas.yaml#/errors/InvalidParameter'
+        "401":
+          $ref: '../common.schemas.yaml#/errors/Unauthorized'
+        "403":
+          $ref: '../common.schemas.yaml#/errors/Forbidden'
+        "500":
+          $ref: '../common.schemas.yaml#/errors/InternalServerError'

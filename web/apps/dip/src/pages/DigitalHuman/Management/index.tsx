@@ -1,28 +1,28 @@
+import { PushpinFilled, PushpinOutlined } from '@ant-design/icons'
 import { Button, message, Spin, Tooltip } from 'antd'
+import clsx from 'clsx'
 import { memo, useEffect, useRef, useState } from 'react'
 import intl from 'react-intl-universal'
 import { useNavigate } from 'react-router-dom'
 import { type DigitalHuman, getDigitalHumanList } from '@/apis'
 import DigitalHumanList from '@/components/DigitalHumanList'
-import DeleteModal from '@/components/DigitalHumanSetting/ActionModal/DeleteModal'
 import Empty from '@/components/Empty'
 import IconFont from '@/components/IconFont'
 import SearchInput from '@/components/SearchInput'
 import { useListService } from '@/hooks/useListService'
+import { usePinnedDigitalHumansStore } from '@/stores/pinnedDigitalHumansStore'
 import { useUserInfoStore } from '@/stores/userInfoStore'
-import { DigitalHumanManagementActionEnum } from './types'
-import { getDigitalHumanManagementMenuItems } from './utils'
 
 const Management = () => {
   const navigate = useNavigate()
   const isAdmin = useUserInfoStore((s) => s.isAdmin)
+  const pinnedDigitalHumans = usePinnedDigitalHumansStore((s) => s.pinnedDigitalHumans)
+  const pinSidebarDigitalHuman = usePinnedDigitalHumansStore((s) => s.pinSidebarDigitalHuman)
+  const unpinSidebarDigitalHuman = usePinnedDigitalHumansStore((s) => s.unpinSidebarDigitalHuman)
   const [, messageContextHolder] = message.useMessage()
   const [hasLoadedData, setHasLoadedData] = useState(false)
   const hasEverHadDataRef = useRef(false)
   const prevSearchValueRef = useRef('')
-  const [deleteModalVisible, setDeleteModalVisible] = useState(false)
-  const [selectedItem, setSelectedItem] = useState<DigitalHuman>()
-
   const {
     items: digitalHumans,
     loading,
@@ -64,21 +64,6 @@ const Management = () => {
       return
     }
     navigate(`/studio/digital-human/${digitalHuman.id}`)
-  }
-
-  const handleMenuClick = (key: DigitalHumanManagementActionEnum, digitalHuman: DigitalHuman) => {
-    setSelectedItem(digitalHuman)
-    switch (key) {
-      case DigitalHumanManagementActionEnum.Session:
-        navigate(`/studio/digital-human/${digitalHuman.id}`)
-        break
-      case DigitalHumanManagementActionEnum.Edit:
-        navigate(`/studio/digital-human/${digitalHuman.id}/setting?mode=edit`)
-        break
-      case DigitalHumanManagementActionEnum.Delete:
-        setDeleteModalVisible(true)
-        break
-    }
   }
 
   const renderStateContent = () => {
@@ -135,14 +120,36 @@ const Management = () => {
       <DigitalHumanList
         digitalHumans={digitalHumans}
         onCardClick={handleCardClick}
-        menuItems={
-          isAdmin
-            ? (digitalHuman) =>
-                getDigitalHumanManagementMenuItems(digitalHuman, (key) =>
-                  handleMenuClick(key, digitalHuman),
-                )
-            : undefined
-        }
+        cardTrailing={(digitalHuman) => {
+          const pinned = pinnedDigitalHumans.some((row) => row.id === digitalHuman.id)
+          const pinLabel = intl.get('digitalHuman.management.menuPinSidebar')
+          const unpinLabel = intl.get('digitalHuman.management.menuUnpinSidebar')
+          return (
+            <Tooltip title={pinned ? unpinLabel : pinLabel}>
+              <button
+                type="button"
+                aria-pressed={pinned}
+                aria-label={pinned ? unpinLabel : pinLabel}
+                className={clsx(
+                  'w-8 h-8 flex items-center justify-center rounded-md transition-colors border-0 cursor-pointer',
+                  pinned
+                    ? 'text-[var(--dip-primary-color)] bg-[rgba(22,119,255,0.06)] hover:bg-[rgba(22,119,255,0.12)]'
+                    : 'bg-transparent text-[var(--dip-text-color-45)] hover:text-[var(--dip-primary-color)] hover:bg-[--dip-hover-bg-color]',
+                )}
+                onClick={() => {
+                  if (pinned) void unpinSidebarDigitalHuman(digitalHuman.id)
+                  else void pinSidebarDigitalHuman(digitalHuman.id)
+                }}
+              >
+                {pinned ? (
+                  <PushpinFilled className="text-base" aria-hidden />
+                ) : (
+                  <PushpinOutlined className="text-base" aria-hidden />
+                )}
+              </button>
+            </Tooltip>
+          )
+        }}
       />
     )
   }
@@ -172,19 +179,6 @@ const Management = () => {
         )}
       </div>
       {renderContent()}
-
-      {/* 删除弹窗 */}
-      <DeleteModal
-        open={deleteModalVisible}
-        onCancel={() => {
-          setDeleteModalVisible(false)
-          setSelectedItem(undefined)
-        }}
-        onOk={() => {
-          handleRefresh()
-        }}
-        deleteData={selectedItem}
-      />
     </div>
   )
 }

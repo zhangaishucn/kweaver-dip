@@ -19,6 +19,8 @@
       "menuEdit": "編輯",
       "menuSession": "會話",
       "menuDelete": "刪除",
+      "menuPinSidebar": "固定到側欄",
+      "menuUnpinSidebar": "取消側欄固定",
       "deleteModalTitle": "確認刪除數位員工",
       "deleteConfirmBody": "您確定要刪除數位員工 __DH_NAME__ 嗎？刪除後，該數位員工下的所有資料將被永久刪除，此操作無法復原。",
       "deleteOk": "刪除",

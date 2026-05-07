@@ -67,7 +67,7 @@ const openClawCronAdapter = new OpenClawCronGatewayAdapter(
     configReader: getOpenClawGatewayRuntimeConfig
   })
 );
-const digitalHumanLogic = new DefaultDigitalHumanLogic({
+export const digitalHumanLogic = new DefaultDigitalHumanLogic({
   openClawAgentsAdapter,
   openClawCronAdapter,
   agentSkillsLogic,

@@ -34,6 +34,17 @@
       "more": "更多",
       "empty": "暫無歷史記錄",
       "deleteAria": "刪除歷史會話"
+    },
+    "pinnedDigitalHumans": {
+      "sectionTitle": "常用數位員工（{count}）",
+      "sectionAria": "側欄常用數位員工",
+      "unpin": "取消固定",
+      "unpinAria": "{name}：更多操作",
+      "pinSuccess": "已固定到側欄",
+      "unpinSuccess": "已取消側欄固定",
+      "pinLimitReached": "側欄最多可固定 {max} 個數位員工，請先取消部分固定後再新增。",
+      "moreCollapsed": "更多（{count}）",
+      "morePopoverAria": "展開檢視其餘常用數位員工"
     }
   }
 }

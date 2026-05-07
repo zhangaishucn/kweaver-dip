@@ -61,6 +61,17 @@ studio:
   KWeaverHydraAdminURL: http://hydra-admin:4445
   useExternalOpenClaw: false
 
+# 与 dip-hub-chart depServices.rds 结构一致
+depServices:
+  rds:
+    system_id: ""
+    host: mariadb-proton-mariadb.resource.svc.cluster.local
+    port: 3306
+    database: "kweaver"
+    user: "dip"
+    password: "3Ci72ILMVn"
+    type: "MariaDB"
+
 resources:
   init:
     requests:

@@ -25,7 +25,7 @@ vi.mock('../EmployeeCard', () => ({
   default: (props: {
     digitalHuman: { id: string; name: string }
     width: number
-    menuItems?: unknown[]
+    cardTrailing?: React.ReactNode
     onCardClick?: (digitalHuman: { id: string; name: string }) => void
   }) => {
     employeeCardMock(props)
@@ -42,27 +42,27 @@ vi.mock('../EmployeeCard', () => ({
 }))
 
 describe('DigitalHumanList/index', () => {
-  it('渲染列表并给每个卡片传递计算后的宽度与菜单', () => {
+  it('渲染列表并给每个卡片传递计算后的宽度与右上角插槽', () => {
     const list = [
       { id: '1', name: '小助手A', creature: 'A 简介' },
       { id: '2', name: '小助手B', creature: 'B 简介' },
     ]
-    const menuItems = vi.fn((digitalHuman: { id: string }) => [{ key: `k-${digitalHuman.id}` }])
+    const cardTrailing = vi.fn((digitalHuman: { id: string }) => <span data-testid={`t-${digitalHuman.id}`} />)
 
-    render(<DigitalHumanList digitalHumans={list as never[]} menuItems={menuItems} />)
+    render(<DigitalHumanList digitalHumans={list as never[]} cardTrailing={cardTrailing} />)
 
     expect(screen.getByTestId('scroll-bar-container')).toBeInTheDocument()
     expect(screen.getByTestId('employee-card-1')).toBeInTheDocument()
     expect(screen.getByTestId('employee-card-2')).toBeInTheDocument()
 
-    expect(menuItems).toHaveBeenCalledTimes(2)
+    expect(cardTrailing).toHaveBeenCalledTimes(2)
     expect(employeeCardMock).toHaveBeenCalledTimes(2)
     expect(employeeCardMock).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({
         digitalHuman: expect.objectContaining({ id: '1', name: '小助手A' }),
         width: 400,
-        menuItems: [{ key: 'k-1' }],
+        cardTrailing: expect.anything(),
       }),
     )
   })

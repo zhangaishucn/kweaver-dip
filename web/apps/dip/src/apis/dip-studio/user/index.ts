@@ -1,3 +1,10 @@
-export type { UserPreferences, UserPreferencesPutBody } from './index.d'
-
-export { getUserPreferences, putUserPreferences } from './preferences'
+export type {
+  PostSidebarPinnedDigitalHumansBody,
+  SidebarPinnedDigitalHuman,
+  SidebarPinnedDigitalHumansState,
+} from './index.d'
+export {
+  deleteSidebarPinnedDigitalHuman,
+  getSidebarPinnedDigitalHumans,
+  postSidebarPinnedDigitalHumans,
+} from './preferences'

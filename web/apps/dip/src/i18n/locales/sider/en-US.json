@@ -34,6 +34,17 @@
       "more": "More",
       "empty": "No history yet",
       "deleteAria": "Delete history session"
+    },
+    "pinnedDigitalHumans": {
+      "sectionTitle": "Pinned digital humans ({count})",
+      "sectionAria": "Pinned digital humans in sidebar",
+      "unpin": "Unpin",
+      "unpinAria": "{name}: more actions",
+      "pinSuccess": "Pinned to sidebar",
+      "unpinSuccess": "Removed from sidebar",
+      "pinLimitReached": "You can pin up to {max} digital employees in the sidebar. Unpin one to add another.",
+      "moreCollapsed": "More ({count})",
+      "morePopoverAria": "Show more pinned digital employees"
     }
   }
 }

@@ -1,5 +1,5 @@
-import { Card, Dropdown, type MenuProps } from 'antd'
-import clsx from 'clsx'
+import { Card } from 'antd'
+import type { ReactNode } from 'react'
 import { useState } from 'react'
 import intl from 'react-intl-universal'
 import type { DigitalHuman } from '@/apis'
@@ -11,13 +11,17 @@ import { cardHeight } from './utils'
 interface EmployeeCardProps {
   digitalHuman: DigitalHuman
   width: number
-  menuItems?: MenuProps['items']
+  /** 卡片右上角自定义区域（如侧栏钉选按钮）；不传则不展示 */
+  cardTrailing?: ReactNode
   /** 卡片菜单点击回调 */
   onCardClick?: (digitalHuman: DigitalHuman) => void
 }
 
-const EmployeeCard: React.FC<EmployeeCardProps> = ({ digitalHuman, menuItems, onCardClick }) => {
-  const [menuOpen, setMenuOpen] = useState(false)
+const EmployeeCard: React.FC<EmployeeCardProps> = ({
+  digitalHuman,
+  cardTrailing,
+  onCardClick,
+}) => {
   const [hovered, setHovered] = useState(false)
   const avatarSrc = resolveDigitalHumanIconSrc(digitalHuman.icon_id)
   const ext = digitalHuman as DigitalHuman & {
@@ -75,29 +79,17 @@ const EmployeeCard: React.FC<EmployeeCardProps> = ({ digitalHuman, menuItems, on
             {digitalHuman.creature || intl.get('digitalHuman.card.noBio')}
           </p>
         </div>
-        {menuItems && menuItems.length > 0 && (
-          <Dropdown
-            menu={{ items: menuItems }}
-            trigger={['click']}
-            placement="bottomRight"
-            onOpenChange={(open) => {
-              setMenuOpen(open)
+        {cardTrailing ? (
+          <div
+            className="flex-shrink-0"
+            onClick={(e) => {
+              e.stopPropagation()
             }}
+            role="presentation"
           >
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation()
-              }}
-              className={clsx(
-                'w-6 h-6 flex items-center justify-center rounded-md text-[var(--dip-text-color-45)] hover:text-[var(--dip-text-color-85)] hover:bg-[--dip-hover-bg-color] transition-colors',
-                menuOpen && 'text-[var(--dip-text-color-85)] bg-[--dip-hover-bg-color]',
-              )}
-            >
-              <IconFont type="icon-more" />
-            </button>
-          </Dropdown>
-        )}
+            {cardTrailing}
+          </div>
+        ) : null}
       </div>
 
       <div className="mt-auto -mx-6 -mb-6 px-6 h-12 bg-[#F8FAFC] flex items-center gap-7 text-xs leading-6 text-[rgba(0,0,0,0.5)]">

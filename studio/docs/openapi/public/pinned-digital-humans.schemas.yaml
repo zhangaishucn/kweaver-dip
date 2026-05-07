@@ -1,0 +1,54 @@
+components:
+  schemas:
+    SidebarPinnedDigitalHuman:
+      type: object
+      description: |
+        单个侧栏钉选行：由服务端组合 `pinned_digital_human_ids` 与数字员工档案得到；
+        已删除或当前无法加载的数字员工**不会**出现在本数组中（服务端已过滤并向存储回写修剪后的 id 列表）。
+        客户端渲染侧栏时直接使用本对象，无需再与 `GET /digital-human` 交叉拼装。
+      properties:
+        id:
+          type: string
+          description: 数字员工 ID
+          maxLength: 128
+        name:
+          type: string
+          description: 展示名称（来自已解析的数字员工档案）
+        creature:
+          type: string
+          description: 岗位 / 角色（与详情接口 IDENTITY Creature 一致）
+        icon_id:
+          type: string
+          description: 图标 ID（与详情接口一致）
+      required:
+        - id
+        - name
+
+    SidebarPinnedDigitalHumansState:
+      type: object
+      description: |
+        当前用户在 Studio 侧栏钉选的数字员工列表（服务端已组合展示字段，且仅含仍可解析的员工）。
+        顺序与 UI 一致：自上而下为按添加时间倒序（`pinned_digital_humans[0]` = 最近钉选）。
+      properties:
+        pinned_digital_humans:
+          type: array
+          description: 已组合后的钉选行，自上而下顺序；至多 8 项（需求 1.5 上限）。
+          maxItems: 8
+          items:
+            $ref: '#/components/schemas/SidebarPinnedDigitalHuman'
+      required:
+        - pinned_digital_humans
+
+    PostSidebarPinnedDigitalHumansRequest:
+      type: object
+      description: |
+        钉选（或重新钉选并置顶）**一个**数字员工：服务端将该 id **移到** `pinned_digital_human_ids` 的**首部**
+        （幂等：已存在则先去重再前置）。若钉选后 distinct id 超过 8 则返回 400。
+        服务端会校验档案可解析后再写入；与 GET 一致，最终存储仍会做不可解析 id 的修剪。
+      properties:
+        pinned_digital_human_id:
+          type: string
+          description: 要钉选或提至最近使用位置的数字员工 id
+          maxLength: 128
+      required:
+        - pinned_digital_human_id

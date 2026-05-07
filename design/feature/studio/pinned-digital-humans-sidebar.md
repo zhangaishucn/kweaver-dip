@@ -3,7 +3,7 @@
 | 项 | 内容 |
 |----|------|
 | **Issue** | [kweaver-ai/kweaver-dip#167](https://github.com/kweaver-ai/kweaver-dip/issues/167) |
-| **文档路径** | `design/feature/studio/issue-167-pinned-digital-humans-sidebar.md` |
+| **文档路径** | `design/feature/studio/pinned-digital-humans-sidebar.md` |
 | **文档类型** | 逻辑设计：**需求分析** + **实现分析** |
 | **状态** | 评审稿 |
 | **说明** | 本文不写具体代码与文件级改动清单；实现分析描述技术方案与契约，供开发联调。 |
@@ -55,11 +55,11 @@
 
 | 规则 | 说明 |
 |------|------|
-| **列表顺序** | 固定项在侧栏自上而下顺序，与「服务端保存的顺序」一致；本期不提供用户侧排序 UI。 |
+| **列表顺序** | 侧栏自上而下为**按添加时间倒序**：**最近**钉选/固定的项显示在**最上**；持久化数组 `pinned_digital_human_ids` 的**第 1 个元素**对应侧栏**最上**一格，以此类推。本期不提供用户拖拽排序。 |
 | **「新会话」语义** | 从侧栏点进某员工时，**不延续**用户此前在**另一员工**下未完成会话的 `sessionKey`；与从首页选员工进会话的直觉一致。若已在会话页仅切换 `employee`，实现上必须有**显式会话重置机制**（如重建会话容器实例、清理当前线程态或注入新的 `conversationKey`），以保证语义上等同「用该员工新开对话」；不能仅依赖 query 变化碰巧触发。 |
 | **幂等** | 同一员工被多次「固定」不应产生重复条目。 |
 | **上限** | 固定数量上限为 **8**；该值以侧栏可稳定展示与快速切换为准，而非存储能力上限。超出时需**明确提示**用户，而非静默失败。 |
-| **失效数据** | 偏好里存在、但当前已不可见的员工（如已删除或无权限）：**不应**作为可点击的有效入口误导用户；同时用户仍需有**感知与清理**该项的能力，避免“看不见但继续占位/占上限”的脏数据状态（实现分析 §2.6）。 |
+| **失效数据** | 偏好里曾钉选、但数字员工已删除或档案不可加载的 id：**不在**钉选接口的 `pinned_digital_humans` 中返回；服务端在 `GET`/`POST`/`DELETE` 组合或变更时**剔除**并在存储中**修剪**对应的 id，避免占上限或需单独「失效行」交互（与 §2.6 对齐）。 |
 | **侧栏折叠** | 侧栏折叠时，固定区行为应与现有 Studio 侧栏其它扩展区块**一致**（如不展开长列表），避免挤占图标栏。 |
 | **国际化** | 区块标题、固定/取消、错误提示等需支持项目已提供语言（至少中英）。 |
 
@@ -110,15 +110,15 @@
 
 ## 2.2 持久化方案选型
 
-**结论**：采用 **dip-studio 用户偏好 API + 库表 `t_studio_user_preference`**，按 `user_id` 隔离，JSON `content` 中维护 `pinned_digital_human_ids: string[]`；接口语义按**字段级 merge / patch**定义，而非整份 `content` 覆盖。
+**结论**：采用 **dip-studio 钉选数字员工 HTTP 资源 + 库表 `t_studio_user_preference`**（每用户一行），仅包含 **`user_id`** 与 **`pinned_digital_human_ids`**（JSON 数组，顺序即展示）及 **`updated_at`**；**不设**通用 `content` JSON 列。对外路径 **`/api/dip-studio/v1/pinned-digital-humans`**。
 
 **理由摘要**：
 
-- 与「每用户一条偏好」模型一致；微应用钉选若落在应用表 `pinned` 上则偏**安装实例级**，与「我的常用数字员工」域不同。  
-- 该偏好仅服务 Studio 域中的数字员工切换与会话入口，对外接口归属 **dip-studio** 更符合现有数字员工、会话历史等接口边界。  
-- 字段可扩展（未来其它 UI 偏好可同属 `content`），无需为单一列表反复加列。  
+- 本期范围仅为侧栏钉选列表，行级-schema 足够；避免预留空列增加迁移与语义歧义。  
+- 若未来存在其它 Studio 级用户偏好，可另建表或另开资源，避免与钉选混在同一行「半结构化 JSON」内。  
+- 对外接口归属 **dip-studio**，与现有数字员工、会话等边界一致。  
 
-**已知限制**：本期仍接受**同一字段**上的最后写入为准（last write wins）；暂不实现版本号/ETag 冲突控制，但写入成功后前端需**立即按服务端返回或重新 GET 的快照回显**，避免客户端停留在过期本地态。后续若偏好编辑场景增多，再评估引入乐观并发控制。
+**已知限制**：本期仍接受钉选列表上的**最后写入为准**（last write wins）；暂不实现版本号/ETag 冲突控制，但写入成功后前端需**立即按服务端返回或重新 GET 的快照回显**，避免客户端停留在过期本地态。
 
 ### 2.2.1 为什么本期仍使用数据库，而不是文件系统
 
@@ -130,7 +130,7 @@
 - **现有 OpenClaw 文件能力的语义不同**：技能目录、workspace 文件、`PLAN.md`、`openclaw.json` 等更偏 agent/workspace 资产或节点配置；本需求中的 pinned 列表是 Studio 业务偏好，直接类比为“也走文件系统”会混淆边界。  
 - **实现复杂度与收益不匹配**：本期 pinned 数据结构极小、访问频率低，数据库方案已经足够简单；若为此改走文件系统，并不能明显降低复杂度，反而会增加多实例与并发写入风险。  
 
-因此，本期采用 **Studio API + 数据库存储** 的方案：对外接口归属 `dip-studio`，对内使用 `t_studio_user_preference` 这类 Studio 专属用户级持久化载体。若后续产品明确收缩为“单机 Studio、本地偏好、不要求多端一致”，再评估文件系统方案会更合适。
+因此，本期采用 **Studio API + 数据库存储** 的方案：对外接口归属 `dip-studio`，对内使用仅承载钉选列表的 `t_studio_user_preference`。**不设**与钉选无关的宽表 JSON 列；其它偏好若进版则单独设计表或接口。
 
 ### 2.2.2 方案关系图
 
@@ -138,12 +138,12 @@
 flowchart LR
     U["用户"] --> S["Studio 侧栏 / 固定入口"]
     S --> F["前端状态层"]
-    F --> P["GET/PUT /api/dip-studio/v1/user/preferences"]
-    P --> T["t_studio_user_preference.content"]
+    F --> P["GET/POST/DELETE …/pinned-digital-humans"]
+    P --> T["t_studio_user_preference.pinned_digital_human_ids"]
     F --> D["getDigitalHumanList()"]
     D --> V["可见数字员工视图模型"]
     T --> V
-    V --> R["PinnedDigitalHumansSection 渲染"]
+    V --> R["侧栏钉选区块渲染"]
 ```
 
 ---
@@ -152,42 +152,62 @@ flowchart LR
 
 ### 2.3.1 存储
 
-- **表**：`t_studio_user_preference`  
+- **表**：`t_studio_user_preference`（每用户一行，仅存钉选）  
 - **主键**：`user_id`（与 `UserInfo.id` / 登录主体一致）  
-- **内容**：`content`（JSON 文本），当前规范键 **`pinned_digital_human_ids`**：`string[]`  
-- **数量上限**：`pinned_digital_human_ids.length <= 8`  
-- **顺序**：数组顺序 = 侧栏自上而下；无排序 UI 时前端**不擅自重排后写回**。
+- **列**：`pinned_digital_human_ids`（JSON 数组或等价类型，有序；存 `string[]`）；`updated_at`（更新时间）  
+- **数量上限**：数组长度 `<= 8`（业务规则见 §1.5，由服务端校验）  
+- **顺序**：数组顺序 = 侧栏自上而下；其中 **index 0 = 最近添加**、**最后一个 = 最早仍保留的钉选**（即「按添加时间倒序」）。用户**新钉选**时客户端调用 **`POST`，请求体只带一个** `pinned_digital_human_id`，由服务端将该 id **置顶**；无排序 UI 时**不擅自**本地重组整表再提交。取消钉选使用 **`DELETE …/{id}`**。
 
 ### 2.3.2 HTTP 契约（摘要）
 
 | 方法 | 路径 | 语义 |
 |------|------|------|
-| `GET` | `/api/dip-studio/v1/user/preferences` | 返回当前用户偏好快照；无记录等价于 `pinned_digital_human_ids: []`。 |
-| `PUT` | `/api/dip-studio/v1/user/preferences` | 按请求体中的**已声明字段**更新偏好；未声明字段保持原值不变。对 `pinned_digital_human_ids` 而言，该字段仍是**全量替换**。 |
+| `GET` | `/api/dip-studio/v1/pinned-digital-humans` | 返回当前用户侧栏钉选；响应体 `pinned_digital_humans` 为服务端**已组合** name/icon 等后的有序列表；无记录等价于 `pinned_digital_humans: []`。 |
+| `POST` | `/api/dip-studio/v1/pinned-digital-humans` | 请求体**仅一个** `pinned_digital_human_id`：将该 id **钉选并置顶**（幂等：已存在则先去重再前置）；超出 8 个**不同** id 时 400；成功响应为组合后的 `pinned_digital_humans`。 |
+| `DELETE` | `/api/dip-studio/v1/pinned-digital-humans/{id}` | 取消对该 id 的钉选（未钉选则幂等）；成功响应同 `GET`。 |
 
-**Body 示例**：
+**POST 请求体示例**（单个 id；服务端写入时仍会按可解析结果修剪整表）：
 
 ```json
 {
-  "pinned_digital_human_ids": ["<id-1>", "<id-2>"]
+  "pinned_digital_human_id": "<id>"
 }
 ```
 
+**GET / POST / DELETE 成功响应示例**（展示数据由服务端组合，前端**不得**仅用 id 再调全量列表接口拼装侧栏）：
+
+```json
+{
+  "pinned_digital_humans": [
+    {
+      "id": "<id-1>",
+      "name": "<名称>",
+      "creature": "<岗位可选>",
+      "icon_id": "<图标可选>"
+    }
+  ]
+}
+```
+
+已删除或档案不可加载的钉选 id **不会**出现在 `pinned_digital_humans` 中；服务端会在 `GET`/`POST`/`DELETE` 时将该 id 从持久化数组中**剔除**或**不再写入**（修剪存储），侧栏列表仅展示仍存在的员工。
+
 **约定说明**：
 
-- 当前接口虽然只展示 `pinned_digital_human_ids`，但服务端更新语义是“**只改传入字段**”，不能把未出现在请求体中的其它 preference key 清空。  
-- `PUT` 成功响应返回**最新偏好快照**；前端以该快照覆盖本地缓存，避免并发场景下 UI 继续显示旧值。
+- `POST` 仅提交 **`pinned_digital_human_id` 一个字段**：服务端把该 id **置顶**到 `pinned_digital_human_ids` 首部（倒序语义见 §1.5）；新增第 9 个**不同** id 时返回 400。  
+- `GET` / `POST` / `DELETE` 成功响应均以 `pinned_digital_humans` 为侧栏渲染的**权威展示数据**（服务端已从数字员工档案组合 name/icon 等；**不含**已删除/不可解析项）。  
+- 当存储中仍含无效 id 时，`GET` 会在组合后**回写**修剪后的 `pinned_digital_human_ids`。**`POST` 在置顶合并后**仍会按可解析结果写回存储；**`DELETE`** 直接去掉路径中的 id 后再组合写回。  
+- 持久化列仍为 `pinned_digital_human_ids` 的 JSON 数组；组合与过滤逻辑在 dip-studio 内完成。
 
 ### 2.3.3 服务端校验（实现约定）
 
-- 有序 **去重**、元素 trim、单 id 最大长度、列表最大条数 **8** 由服务端校验并返回明确错误。  
-- **不**在 hub 内校验 id 是否仍存在于 dip-studio，避免强耦合；失效 id 的识别与清理由展示层承接（见 §2.6），但不能让其长期处于“静默隐藏且不可移除”的状态。
+- `POST` 请求体单个 id 的 trim、最大长度与**钉选后 distinct 数 ≤8** 由服务端校验；档案不可解析时返回错误且不置顶。  
+- 组合钉选响应时，dip-studio 对无法加载的数字员工 id **直接跳过**，并在与存储不一致时**修剪** `pinned_digital_human_ids`；不在响应中保留「仅 id、无档案」的占位行。
 
 ### 2.3.4 客户端更新模式
 
-- **添加**：`GET` → 追加 id（如尾部）→ `PUT` `pinned_digital_human_ids` 字段。  
-- **移除**：`GET` → 过滤 id → `PUT` `pinned_digital_human_ids` 字段。  
-- **写后回显**：以 `PUT` 响应体或紧随其后的 `GET` 结果覆盖本地缓存，不依赖本地推断结果长期驻留。  
+- **添加**：`POST`，`{ "pinned_digital_human_id": "<新 id>" }`（一次仅一个 id；服务端置顶）；**以响应体中的 `pinned_digital_humans` 更新展示**。  
+- **移除**：`DELETE /pinned-digital-humans/{id}`；**以响应体中的 `pinned_digital_humans` 更新展示**。  
+- **写后回显**：以 `POST` / `DELETE` 响应体或紧随其后的 `GET` 结果覆盖本地缓存，不依赖本地推断结果长期驻留。  
 - **拉取时机**：每 **token 会话**至少拉取一次；可选与 `fetchPinnedMicroApps` 类单飞策略对齐；窗口聚焦刷新按需、需防抖。
 
 ---
@@ -196,9 +216,8 @@ flowchart LR
 
 ### 2.4.1 进入页 / 刷新后有固定项
 
-1. `GET /api/dip-studio/v1/user/preferences` 得 id 列表。  
-2. `getDigitalHumanList()`（及必要时详情）join **name / icon**；对无权限/不存在的 id 标记为**失效项**。  
-3. 渲染侧栏区块组件（如 `PinnedDigitalHumansSection`，名称可调整）。
+1. `GET /api/dip-studio/v1/pinned-digital-humans` 得 `pinned_digital_humans`（仅含仍可解析的数字员工；已删除项已从响应与存储侧栏视图中消失）。  
+2. 直接渲染侧栏区块组件（如 `PinnedDigitalHumansSection`）；**无需**再拉全量数字员工列表仅为拼装钉选区展示。
 
 ### 2.4.2 点击侧栏固定项
 
@@ -223,12 +242,12 @@ sequenceDiagram
 
 ### 2.4.3 固定 / 取消固定
 
-1. 固定：取当前员工 id → `GET` → 若已存在则幂等 → 否则追加 → `PUT`。  
-2. 取消：`GET` → 移除 → `PUT`。  
+1. 固定：`POST`，请求体 `{ "pinned_digital_human_id": "<当前员工 id>" }` → 以响应 `pinned_digital_humans` 为准。  
+2. 取消：`DELETE …/pinned-digital-humans/<id>` → 以响应为准。
 3. 可选乐观更新 + 失败回滚。  
 4. 成功后以服务端最新快照覆盖本地状态；若发现返回结果与预期不一致，以服务端为准。
 
-**优化（非必须）**：展示层发现失效项后，可在用户显式移除之外，增加异步清理策略；若这样做，需避免高频写放大并保证不会误删暂时不可见的数据。
+**说明**：失效钉选 id 的清理由 **dip-studio 钉选接口在组合时同步修剪存储** 完成；前端不必再实现单独的「失效项异步清理」链路，除非产品需要与钉选域之外的列表强一致时的补充策略。
 
 ---
 
@@ -236,7 +255,7 @@ sequenceDiagram
 
 | 模块 | 职责 |
 |------|------|
-| 状态层 | 缓存 id 列表；`fetch` / `pin` / `unpin`；与 token 生命周期对齐。 |
+| 状态层 | 缓存 `pinned_digital_humans` 快照；通过 `POST`（单 id 置顶）与 `DELETE` 维护列表；与 token 生命周期对齐。 |
 | 侧栏区块 | 列表 UI、空态隐藏、折叠与 `WorkPlanSection` 等一致。 |
 | 固定入口 | 列表或会话内至少一处；调状态层。 |
 | 路由 | 只消费 `employee`，不持久化偏好。 |
@@ -249,28 +268,24 @@ sequenceDiagram
 
 | 场景 | 策略 |
 |------|------|
-| 偏好 id 无对应列表项 | 展示为**不可点击的失效项**（文案如“该数字员工已不可用”），并提供移除操作；必要时再由后台异步清理，避免失效项继续占用 **8** 个名额中的配额。 |
+| 偏好 id 指向已删除员工 | 钉选 API **不返回**该项；`GET` 时修剪存储中的 id，**不占**钉选名额；前端侧栏不出现「失效行」，也无需单独移除交互。 |
 | 员工列表接口失败 | 可暂存 id；降级为缩写 id、隐藏区块或 toast。 |
 | 偏好接口失败 | 与现有 `preferenceStore` 风格一致的错误提示。 |
-| 鉴权 | Bearer token；与 dip-hub 其它受保护路由一致。 |
-| 权限 | 「固定」≠ 管理权限；不可见员工不能作为有效跳转入口，但其 pinned 记录仍应允许用户清理。 |
+| 鉴权 | Bearer token；与 dip-studio 其它受保护路由一致（经网关时与同产品其它 API 对齐）。 |
+| 权限 | 「固定」≠ 管理权限；钉选接口返回的项均可解析为当前有效数字员工。列表/权限与钉选存储不一致时的边界以现有员工可见性规则为准。 |
 
-### 2.6.1 失效项与并发回显关系图
+### 2.6.1 钉选组合与存储修剪（概念）
 
 ```mermaid
 flowchart TD
-    A["读取 pinned_digital_human_ids"] --> B{"id 是否仍可见"}
-    B -- "是" --> C["渲染为可点击 pinned 项"]
-    B -- "否" --> D["渲染为失效项"]
-    D --> E["允许用户移除"]
-    E --> F["PUT 更新 pinned_digital_human_ids"]
-    C --> G["用户 pin / unpin"]
-    G --> F
-    F --> H["服务端返回最新偏好快照"]
-    H --> I["前端覆盖本地缓存"]
-    I --> J{"结果与本地预期一致?"}
-    J -- "是" --> K["正常展示"]
-    J -- "否" --> L["以服务端结果为准回显"]
+    A["读取 pinned_digital_human_ids"] --> B["按序解析数字员工档案"]
+    B --> C["跳过不可解析的 id"]
+    C --> D["生成 pinned_digital_humans 响应"]
+    C --> E{"存储 id 序列与有效序列一致?"}
+    E -- "否" --> F["回写修剪后的 pinned_digital_human_ids"]
+    E -- "是" --> G["不额外写库"]
+    F --> H["返回响应"]
+    G --> H
 ```
 
 ---
@@ -279,10 +294,10 @@ flowchart TD
 
 | 层级 | 要点 |
 |------|------|
-| 服务 | 去重、上限 **8**、长度、PUT 字段更新语义。 |
+| 服务 | 单 id 校验、上限 **8**、`GET`/`POST`/`DELETE` 组合时剔除无效 id 并修剪存储。 |
 | 前端状态 | pin 幂等、unpin 一致、换 token 重拉、写后按服务端快照覆盖本地。 |
 | E2E / 手工 | URL `employee` 正确；无错误续用旧 `sessionKey`；切换 pinned 员工后会话容器确实 reset。 |
-| 异常数据 | 失效项可见但不可点击、可移除，且不会导致用户侧“看起来未超上限但实际无法继续 pin”。 |
+| 异常数据 | 无效钉选 id 由服务端在钉选接口侧过滤；侧栏不出现「仅 id、无档案」占位行；名额不被脏 id 占用。 |
 | 并发 | 两端近同时编辑时接受最后写入覆盖，但成功写入后 UI 必须回显服务端最终结果。 |
 | 回归 | `HomeSider` / `AdminSider` 行为一致；折叠布局。 |
 
@@ -290,9 +305,9 @@ flowchart TD
 
 ## 2.8 实施阶段与风险
 
-**建议顺序**：状态层 + API 联调 → 侧栏只读 + 跳转 → 固定/取消入口 → 脏 id、i18n、a11y。
+**建议顺序**：状态层 + API 联调 → 侧栏只读 + 跳转 → 固定/取消入口 → i18n、a11y。
 
-**风险**：同一偏好字段在多端并发编辑时仍可能被后写覆盖；本期通过“字段级 merge + 写后服务端快照回显”降低体感错误，但不解决真正的冲突检测。另一个关键约束是 pinned 上限 **8** 与侧栏承载能力强绑定；若后续产品希望支持更多固定项，需同时补“展开更多 / 独立管理面板 / 自定义排序”等交互，而不是单独放宽上限。
+**风险**：同一钉选列表在多端并发编辑时仍可能被后写覆盖；本期通过「**单 id POST 置顶 + DELETE 取消 + 写后服务端快照回显**」降低体感错误，但不解决真正的冲突检测。另一个关键约束是 pinned 上限 **8** 与侧栏承载能力强绑定；若后续产品希望支持更多固定项，需同时补“展开更多 / 独立管理面板 / 自定义排序”等交互，而不是单独放宽上限。
 
 ---
 
@@ -300,14 +315,4 @@ flowchart TD
 
 - [ ] 需求 1.3 五项均可追溯至实现或测试用例。  
 - [ ] 用户级存储与微应用钉选域分离清晰。  
-- [ ] GET→改→PUT 模式在 PR 说明或代码注释中可追溯。  
-
----
-
-## 文档修订记录
-
-| 日期 | 说明 |
-|------|------|
-| 2026-05-06 | 初版、迁移路径、API 与表结构要点 |
-| 2026-05-06 | 拆分为「需求分析」「实现分析」两大部分 |
-| 2026-05-06 | 根据评审补充新会话 reset 契约、偏好字段级 merge 语义、失效项清理策略与并发覆盖边界 |
+- [ ] GET→POST（单 id）/ DELETE→回显 模式在 PR 说明或代码注释中可追溯。  

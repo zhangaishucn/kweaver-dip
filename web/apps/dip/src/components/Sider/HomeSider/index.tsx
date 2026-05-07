@@ -12,12 +12,14 @@ import { useOEMConfigStore } from '@/stores/oemConfigStore'
 import { useUserHistoryStore } from '@/stores/userHistoryStore'
 import { useUserInfoStore } from '@/stores/userInfoStore'
 import { useUserWorkPlanStore } from '@/stores/userWorkPlanStore'
+import { usePinnedDigitalHumansStore } from '@/stores/pinnedDigitalHumansStore'
 import { ExternalLinksSection } from '../components/ExternalLinksMenu'
 import { HistorySection } from '../components/HistorySection'
 import { SiderFooterUser } from '../components/SiderFooterUser'
 import { StoreMenuSection } from '../components/StoreMenuSection'
 import { StudioMenuSection } from '../components/StudioMenuSection'
 import { WorkPlanSection } from '../components/WorkPlanSection'
+import { PinnedDigitalHumansSection } from '../components/PinnedDigitalHumansSection'
 
 interface HomeSiderProps {
   /** 是否折叠 */
@@ -64,6 +66,10 @@ const HomeSider = ({ collapsed, onCollapse, layout = 'entry' }: HomeSiderProps) 
   const { getOEMResourceConfig } = useOEMConfigStore()
   const oemResourceConfig = getOEMResourceConfig(language)
   const modules = useUserInfoStore((s) => s.modules)
+  const pinnedDigitalHumans = usePinnedDigitalHumansStore((s) => s.pinnedDigitalHumans)
+  const fetchSidebarPinnedDigitalHumans = usePinnedDigitalHumansStore(
+    (s) => s.fetchSidebarPinnedDigitalHumans,
+  )
   // TODO: 角色信息需要从其他地方获取，暂时使用空数组
   const roleIds = useMemo(() => new Set<string>([]), [])
   const hasStudio = modules.includes('studio')
@@ -112,6 +118,11 @@ const HomeSider = ({ collapsed, onCollapse, layout = 'entry' }: HomeSiderProps) 
     if (!hasStudio) return
     void fetchSessions()
   }, [fetchSessions, hasStudio])
+
+  useEffect(() => {
+    if (!hasStudio) return
+    void fetchSidebarPinnedDigitalHumans()
+  }, [fetchSidebarPinnedDigitalHumans, hasStudio])
 
   useEffect(() => {
     const match = location.pathname.match(/^\/studio\/history\/([^/]+)$/)
@@ -202,6 +213,10 @@ const HomeSider = ({ collapsed, onCollapse, layout = 'entry' }: HomeSiderProps) 
               navigate={navigate}
               allowedKeys={['digital-human']}
             />
+
+            {!collapsed && pinnedDigitalHumans.length > 0 ? (
+              <PinnedDigitalHumansSection items={pinnedDigitalHumans} />
+            ) : null}
 
             {!collapsed && topPlans.length > 0 ? (
               <WorkPlanSection
