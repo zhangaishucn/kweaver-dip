@@ -14,3 +14,7 @@ spec:
       targetPort: {{ .Values.service.targetPort }}
       protocol: TCP
       name: http
+    - port: {{ .Values.service.mcpPort }}
+      targetPort: {{ .Values.service.mcpTargetPort }}
+      protocol: TCP
+      name: mcp

@@ -7,3 +7,5 @@ data:
   NODE_ENV: {{ .Values.studio.nodeEnv | quote }}
   KWEAVER_HYDRA_ADMIN_URL: {{ .Values.studio.KWeaverHydraAdminURL | quote }}
   USE_EXTERNAL_OPENCLAW: {{ .Values.studio.useExternalOpenClaw | quote }}
+  MCP_HOST: {{ .Values.studio.mcpHost | quote }}
+  MCP_PORT: {{ .Values.studio.mcpPort | quote }}

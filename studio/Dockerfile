@@ -24,6 +24,7 @@ FROM node:25.9-bookworm AS runtime
 WORKDIR /app
 
 COPY --from=builder /build/package.json ./package.json
+COPY --from=builder /build/mcporter.json /root/.mcporter/mcporter.json
 COPY --from=builder /build/dist ./dist
 COPY --from=builder /build/assets ./assets
 COPY --from=builder /build/templates ./templates
@@ -34,6 +35,7 @@ COPY --from=builder /build/node_modules ./node_modules
 
 RUN ln -sf /app/node_modules/openclaw/openclaw.mjs /usr/local/bin/openclaw \
     && ln -sf /app/node_modules/@kweaver-ai/kweaver-sdk/bin/kweaver.js /usr/local/bin/kweaver \
+    && ln -sf /app/node_modules/mcporter/dist/cli.js /usr/local/bin/mcporter \
     && chmod +x /app/scripts/docker-entrypoint.sh /app/scripts/openclaw-init.sh
 
 EXPOSE 3000

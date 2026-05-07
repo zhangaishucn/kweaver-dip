@@ -1,0 +1,13 @@
+{
+  "$schema": "https://raw.githubusercontent.com/steipete/mcporter/main/mcporter.schema.json",
+  "mcpServers": {
+    "dip-studio": {
+      "description": "数字员工 MCP 服务",
+      "baseUrl": "http://127.0.0.1:3001/mcp",
+      "headers": {
+        "Accept": "application/json, text/event-stream",
+        "Content-Type": "application/json"
+      }
+    }
+  }
+}

@@ -52,6 +52,9 @@ spec:
             - containerPort: {{ .Values.service.port }}
               name: studio-http
               protocol: TCP
+            - containerPort: {{ .Values.service.mcpTargetPort }}
+              name: studio-mcp
+              protocol: TCP
           env:
             - name: NODE_ENV
               valueFrom:
@@ -68,6 +71,16 @@ spec:
                 configMapKeyRef:
                   name: {{ .Chart.Name }}-config
                   key: USE_EXTERNAL_OPENCLAW
+            - name: MCP_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Chart.Name }}-config
+                  key: MCP_HOST
+            - name: MCP_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Chart.Name }}-config
+                  key: MCP_PORT
           resources:
             {{- toYaml .Values.resources.studio | nindent 12 }}
           volumeMounts:

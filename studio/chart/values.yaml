@@ -22,6 +22,8 @@ service:
   type: ClusterIP
   port: 3000
   targetPort: 3000
+  mcpPort: 3001
+  mcpTargetPort: 3001
 
 class-443:
   ingressClass: 'class-443'
@@ -49,6 +51,8 @@ studio:
   OpenClawHostPath: /root/.openclaw/
   KWeaverHydraAdminURL: http://hydra-admin:4445
   useExternalOpenClaw: false
+  mcpHost: 0.0.0.0
+  mcpPort: 3001
 
 resources:
   init:
