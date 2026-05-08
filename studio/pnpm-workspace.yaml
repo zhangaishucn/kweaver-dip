@@ -1,0 +1,13 @@
+# Approve native/postinstall scripts for transitive deps (e.g. OpenClaw).
+# Required when strictDepBuilds is true (pnpm default); see https://pnpm.io/settings#allowbuilds
+packages:
+  - '.'
+
+allowBuilds:
+  '@google/genai': true
+  '@whiskeysockets/baileys': true
+  esbuild: true
+  koffi: true
+  node-llama-cpp: true
+  protobufjs: true
+  sharp: true
