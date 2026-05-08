@@ -53,6 +53,46 @@ export interface OpenClawGatewayRuntimeConfig {
 }
 
 /**
+ * Studio platform connection configuration cached from RDS.
+ */
+export interface StudioRuntimeConfig {
+  /**
+   * KWeaver service base URL.
+   */
+  kweaverBaseUrl: string;
+
+  /**
+   * OpenClaw gateway WebSocket URL.
+   */
+  openClawGatewayUrl: string;
+
+  /**
+   * OpenClaw gateway token.
+   */
+  openClawGatewayToken: string;
+}
+
+let studioRuntimeConfig: StudioRuntimeConfig | undefined;
+
+/**
+ * Updates the in-memory Studio runtime configuration cache.
+ *
+ * @param config Studio connection configuration loaded from RDS.
+ */
+export function setStudioRuntimeConfig(config: StudioRuntimeConfig | undefined): void {
+  studioRuntimeConfig = config;
+}
+
+/**
+ * Reads the in-memory Studio runtime configuration cache.
+ *
+ * @returns The cached Studio connection configuration when present.
+ */
+export function getStudioRuntimeConfig(): StudioRuntimeConfig | undefined {
+  return studioRuntimeConfig;
+}
+
+/**
  * Resolves the HTTP port from an environment variable.
  *
  * @param value The raw environment variable value.
@@ -99,19 +139,24 @@ export function getEnv(): {
   const gatewayHost = resolveGatewayHost(process.env.OPENCLAW_GATEWAY_HOST);
   const gatewayPort = resolveGatewayPort(process.env.OPENCLAW_GATEWAY_PORT);
   const gatewayUrl =
+    studioRuntimeConfig?.openClawGatewayUrl ??
     readOptionalString(process.env.OPENCLAW_GATEWAY_URL) ??
     buildGatewayUrl(gatewayProtocol, gatewayHost, gatewayPort);
 
   return {
     port: resolvePort(process.env.PORT),
-    bknBackendUrl: resolveBknBackendUrl(process.env.KWEAVER_BASE_URL),
+    bknBackendUrl: resolveBknBackendUrl(
+      studioRuntimeConfig?.kweaverBaseUrl ?? process.env.KWEAVER_BASE_URL
+    ),
     appUserToken: readOptionalString(process.env.KWEAVER_TOKEN),
     hydraAdminUrl: resolveHydraAdminUrl(process.env.KWEAVER_HYDRA_ADMIN_URL),
     isDevelopment: isDevelopmentMode(process.env.NODE_ENV),
     oauthMockUserId: readOptionalString(process.env.OAUTH_MOCK_USER_ID),
     openClawGatewayUrl: gatewayUrl,
     openClawGatewayHttpUrl: resolveGatewayHttpUrl(gatewayUrl),
-    openClawGatewayToken: readOptionalString(process.env.OPENCLAW_GATEWAY_TOKEN),
+    openClawGatewayToken:
+      studioRuntimeConfig?.openClawGatewayToken ??
+      readOptionalString(process.env.OPENCLAW_GATEWAY_TOKEN),
     openClawGatewayTimeoutMs: resolveTimeoutMs(process.env.OPENCLAW_GATEWAY_TIMEOUT_MS),
     openClawWorkspaceDir: resolveWorkspaceDir()
   };

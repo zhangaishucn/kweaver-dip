@@ -1,4 +1,5 @@
 import type { DigitalEmployeeTokenAdapter } from "../adapters/digital-employee-token-adapter";
+import type { StudioConfigAdapter } from "../adapters/studio-config-adapter";
 
 /**
  * Request payload for the `get_kweaver_token` MCP tool.
@@ -55,6 +56,18 @@ export interface GetBknScopeResult {
 }
 
 /**
+ * Response payload for the `get_kweaver_base_url` MCP tool.
+ */
+export interface GetKweaverBaseUrlResult {
+  [key: string]: unknown;
+
+  /**
+   * KWeaver service base URL configured for DIP Studio.
+   */
+  kweaver_base_url: string;
+}
+
+/**
  * Application logic exposed through the Studio MCP server.
  */
 export interface StudioMcpLogic {
@@ -73,6 +86,13 @@ export interface StudioMcpLogic {
    * @returns The BKN scope result.
    */
   getBknScope(request: GetBknScopeRequest): Promise<GetBknScopeResult>;
+
+  /**
+   * Gets the KWeaver service base URL configured for DIP Studio.
+   *
+   * @returns The configured KWeaver service base URL.
+   */
+  getKweaverBaseUrl(): Promise<GetKweaverBaseUrlResult>;
 }
 
 /**
@@ -91,6 +111,19 @@ export class KweaverTokenNotFoundError extends Error {
 }
 
 /**
+ * Error raised when Studio platform configuration is not present.
+ */
+export class StudioConfigNotFoundError extends Error {
+  /**
+   * Creates the error.
+   */
+  public constructor() {
+    super("Studio config not found");
+    this.name = "StudioConfigNotFoundError";
+  }
+}
+
+/**
  * Default MCP business logic implementation.
  */
 export class DefaultStudioMcpLogic implements StudioMcpLogic {
@@ -98,8 +131,12 @@ export class DefaultStudioMcpLogic implements StudioMcpLogic {
    * Creates the logic.
    *
    * @param tokenAdapter Adapter used to read token data.
+   * @param configAdapter Adapter used to read Studio platform configuration.
    */
-  public constructor(private readonly tokenAdapter: DigitalEmployeeTokenAdapter) {}
+  public constructor(
+    private readonly tokenAdapter: DigitalEmployeeTokenAdapter,
+    private readonly configAdapter: StudioConfigAdapter
+  ) {}
 
   /**
    * Gets the KWeaver token for one digital employee.
@@ -151,6 +188,25 @@ export class DefaultStudioMcpLogic implements StudioMcpLogic {
     return {
       agentId,
       bkn_scope: bknScope?.trim() ?? ""
+    };
+  }
+
+  /**
+   * Gets the KWeaver service base URL configured for DIP Studio.
+   *
+   * @returns The configured KWeaver service base URL.
+   * @throws {StudioConfigNotFoundError} Thrown when no Studio config is stored.
+   */
+  public async getKweaverBaseUrl(): Promise<GetKweaverBaseUrlResult> {
+    const config = await this.configAdapter.findStudioConfig();
+    const baseUrl = config?.kweaver_base_url.trim();
+
+    if (baseUrl === undefined || baseUrl.length === 0) {
+      throw new StudioConfigNotFoundError();
+    }
+
+    return {
+      kweaver_base_url: baseUrl
     };
   }
 }

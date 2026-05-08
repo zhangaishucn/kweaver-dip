@@ -9,7 +9,7 @@ import type { StudioMcpLogic } from "../logic/mcp";
  */
 export type McpToolRegistrar = Pick<McpServer, "registerTool">;
 
-type StudioToolHandler = (args: { agentId: string }) => Promise<CallToolResult>;
+type StudioToolHandler = (args: any) => Promise<CallToolResult>;
 type StudioToolRegistrar = (
   name: string,
   config: {
@@ -31,7 +31,44 @@ export function registerStudioMcpTools(
   server: McpToolRegistrar,
   logic: StudioMcpLogic
 ): void {
-  const registerTool = server.registerTool.bind(server) as StudioToolRegistrar;
+  const registerTool = server.registerTool.bind(server) as unknown as StudioToolRegistrar;
+
+  registerTool(
+    "get_kweaver_base_url",
+    {
+      title: "Get KWeaver Base URL",
+      description: "获取 DIP Studio 配置的 KWeaver 服务连接地址。",
+      inputSchema: {},
+      outputSchema: {
+        kweaver_base_url: z.string()
+      }
+    },
+    async () => {
+      try {
+        const output = await logic.getKweaverBaseUrl();
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(output)
+            }
+          ],
+          structuredContent: output
+        };
+      } catch (error: unknown) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text: error instanceof Error ? error.message : String(error)
+            }
+          ]
+        };
+      }
+    }
+  );
 
   registerTool(
     "get_kweaver_token",

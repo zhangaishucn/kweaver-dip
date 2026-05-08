@@ -12,11 +12,48 @@ import { registerStudioMcpTools, type McpToolRegistrar } from "./tools";
 function createLogicDouble(): StudioMcpLogic {
   return {
     getKweaverToken: vi.fn(),
-    getBknScope: vi.fn()
+    getBknScope: vi.fn(),
+    getKweaverBaseUrl: vi.fn()
   };
 }
 
 describe("registerStudioMcpTools", () => {
+  it("registers get_kweaver_base_url and returns structured content", async () => {
+    const logic = createLogicDouble();
+    vi.mocked(logic.getKweaverBaseUrl).mockResolvedValue({
+      kweaver_base_url: "https://kweaver.example.com"
+    });
+    let handler: (() => Promise<CallToolResult>) | undefined;
+    const registrar: McpToolRegistrar = {
+      registerTool: vi.fn((name, _config, registeredHandler) => {
+        if (name === "get_kweaver_base_url") {
+          handler = registeredHandler as () => Promise<CallToolResult>;
+        }
+      })
+    };
+
+    registerStudioMcpTools(registrar, logic);
+
+    expect(registrar.registerTool).toHaveBeenCalledWith(
+      "get_kweaver_base_url",
+      expect.objectContaining({
+        title: "Get KWeaver Base URL"
+      }),
+      expect.any(Function)
+    );
+    await expect(handler?.()).resolves.toEqual({
+      content: [
+        {
+          type: "text",
+          text: "{\"kweaver_base_url\":\"https://kweaver.example.com\"}"
+        }
+      ],
+      structuredContent: {
+        kweaver_base_url: "https://kweaver.example.com"
+      }
+    });
+  });
+
   it("registers get_kweaver_token and returns structured content", async () => {
     const logic = createLogicDouble();
     vi.mocked(logic.getKweaverToken).mockResolvedValue({

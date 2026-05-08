@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { DigitalEmployeeTokenAdapter } from "../adapters/digital-employee-token-adapter";
+import type { StudioConfigAdapter } from "../adapters/studio-config-adapter";
 import {
   DefaultStudioMcpLogic,
-  KweaverTokenNotFoundError
+  KweaverTokenNotFoundError,
+  StudioConfigNotFoundError
 } from "./mcp";
 
 /**
@@ -23,11 +25,37 @@ function createTokenAdapterDouble(): DigitalEmployeeTokenAdapter {
   };
 }
 
+/**
+ * Creates a Studio config adapter test double.
+ *
+ * @returns A mocked Studio config adapter.
+ */
+function createConfigAdapterDouble(): StudioConfigAdapter {
+  return {
+    findStudioConfig: vi.fn(),
+    upsertStudioConfig: vi.fn()
+  };
+}
+
+/**
+ * Creates default MCP logic with test doubles.
+ *
+ * @param tokenAdapter Optional token adapter override.
+ * @param configAdapter Optional Studio config adapter override.
+ * @returns The logic under test.
+ */
+function createLogic(
+  tokenAdapter: DigitalEmployeeTokenAdapter = createTokenAdapterDouble(),
+  configAdapter: StudioConfigAdapter = createConfigAdapterDouble()
+): DefaultStudioMcpLogic {
+  return new DefaultStudioMcpLogic(tokenAdapter, configAdapter);
+}
+
 describe("DefaultStudioMcpLogic", () => {
   it("returns the token for an existing digital employee", async () => {
     const adapter = createTokenAdapterDouble();
     vi.mocked(adapter.findKweaverToken).mockResolvedValue("token-1");
-    const logic = new DefaultStudioMcpLogic(adapter);
+    const logic = createLogic(adapter);
 
     await expect(logic.getKweaverToken({ agentId: " agent-1 " })).resolves.toEqual({
       agentId: "agent-1",
@@ -37,7 +65,7 @@ describe("DefaultStudioMcpLogic", () => {
   });
 
   it("rejects an empty agent id", async () => {
-    const logic = new DefaultStudioMcpLogic(createTokenAdapterDouble());
+    const logic = createLogic();
 
     await expect(logic.getKweaverToken({ agentId: " " })).rejects.toThrow(
       "agentId is required"
@@ -47,7 +75,7 @@ describe("DefaultStudioMcpLogic", () => {
   it("rejects a missing token", async () => {
     const adapter = createTokenAdapterDouble();
     vi.mocked(adapter.findKweaverToken).mockResolvedValue(undefined);
-    const logic = new DefaultStudioMcpLogic(adapter);
+    const logic = createLogic(adapter);
 
     await expect(logic.getKweaverToken({ agentId: "agent-1" })).rejects.toBeInstanceOf(
       KweaverTokenNotFoundError
@@ -57,7 +85,7 @@ describe("DefaultStudioMcpLogic", () => {
   it("rejects a blank token", async () => {
     const adapter = createTokenAdapterDouble();
     vi.mocked(adapter.findKweaverToken).mockResolvedValue(" ");
-    const logic = new DefaultStudioMcpLogic(adapter);
+    const logic = createLogic(adapter);
 
     await expect(logic.getKweaverToken({ agentId: "agent-1" })).rejects.toThrow(
       "KWeaver token not found for digital employee: agent-1"
@@ -67,7 +95,7 @@ describe("DefaultStudioMcpLogic", () => {
   it("returns the BKN scope for an existing digital employee", async () => {
     const adapter = createTokenAdapterDouble();
     vi.mocked(adapter.findBknScope).mockResolvedValue("kn-1,kn-2");
-    const logic = new DefaultStudioMcpLogic(adapter);
+    const logic = createLogic(adapter);
 
     await expect(logic.getBknScope({ agentId: " agent-1 " })).resolves.toEqual({
       agentId: "agent-1",
@@ -79,11 +107,35 @@ describe("DefaultStudioMcpLogic", () => {
   it("returns an empty BKN scope when not configured", async () => {
     const adapter = createTokenAdapterDouble();
     vi.mocked(adapter.findBknScope).mockResolvedValue(undefined);
-    const logic = new DefaultStudioMcpLogic(adapter);
+    const logic = createLogic(adapter);
 
     await expect(logic.getBknScope({ agentId: "agent-1" })).resolves.toEqual({
       agentId: "agent-1",
       bkn_scope: ""
     });
+  });
+
+  it("returns the configured KWeaver base URL", async () => {
+    const configAdapter = createConfigAdapterDouble();
+    vi.mocked(configAdapter.findStudioConfig).mockResolvedValue({
+      kweaver_base_url: " https://kweaver.example.com ",
+      openclaw_address: "ws://127.0.0.1:19001",
+      openclaw_token: "token-1"
+    });
+    const logic = createLogic(createTokenAdapterDouble(), configAdapter);
+
+    await expect(logic.getKweaverBaseUrl()).resolves.toEqual({
+      kweaver_base_url: "https://kweaver.example.com"
+    });
+  });
+
+  it("rejects a missing KWeaver base URL", async () => {
+    const configAdapter = createConfigAdapterDouble();
+    vi.mocked(configAdapter.findStudioConfig).mockResolvedValue(undefined);
+    const logic = createLogic(createTokenAdapterDouble(), configAdapter);
+
+    await expect(logic.getKweaverBaseUrl()).rejects.toBeInstanceOf(
+      StudioConfigNotFoundError
+    );
   });
 });

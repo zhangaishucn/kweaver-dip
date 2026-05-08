@@ -7,6 +7,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 
 import { DefaultDigitalEmployeeTokenAdapter } from "../adapters/digital-employee-token-adapter";
+import { DefaultStudioConfigAdapter } from "../adapters/studio-config-adapter";
 import { createStudioDatabasePool } from "../infra/mariadb-client";
 import { DefaultStudioMcpLogic, type StudioMcpLogic } from "../logic/mcp";
 import { getStudioDatabaseConfig } from "../utils/env";
@@ -25,8 +26,9 @@ export type StudioMcpServerFactory = () => McpServer;
 export function createDefaultStudioMcpLogic(): StudioMcpLogic {
   const pool = createStudioDatabasePool(getStudioDatabaseConfig());
   const tokenAdapter = new DefaultDigitalEmployeeTokenAdapter(pool);
+  const configAdapter = new DefaultStudioConfigAdapter(pool);
 
-  return new DefaultStudioMcpLogic(tokenAdapter);
+  return new DefaultStudioMcpLogic(tokenAdapter, configAdapter);
 }
 
 /**

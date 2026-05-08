@@ -51,7 +51,7 @@ export default defineConfig({
     ],
   },
   server: {
-    port: 3001,
+    port: 8000,
     // 配置代理，解决远程微应用 CORS 问题
     proxy: {
       // 子应用代理

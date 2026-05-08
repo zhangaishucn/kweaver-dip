@@ -1,16 +1,23 @@
-import { access, mkdir, readFile, writeFile } from "node:fs/promises";
+import { access, readFile, writeFile } from "node:fs/promises";
 import { constants as fsConstants } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { homedir } from "node:os";
 import { promisify } from "node:util";
 import { execFile } from "node:child_process";
 
 import { HttpError } from "../errors/http-error";
 import { OpenClawAgentsGatewayAdapter } from "../adapters/openclaw-agents-adapter";
+import {
+  DefaultStudioConfigAdapter,
+  type StudioConfigAdapter
+} from "../adapters/studio-config-adapter";
 import { OpenClawGatewayClient } from "../infra/openclaw-gateway-client";
+import { createStudioDatabasePool } from "../infra/mariadb-client";
 import { connectOpenClawGateway } from "./openclaw-gateway-bootstrap";
 import {
   asMessage,
+  getStudioDatabaseConfig,
+  getStudioRuntimeConfig,
   getOpenClawGatewayRuntimeConfig,
   loadEnvFile,
   readOptionalString,
@@ -18,7 +25,8 @@ import {
   resolveGatewayHost,
   resolveGatewayPort,
   resolveGatewayProtocol,
-  resolveWorkspaceDir
+  resolveWorkspaceDir,
+  setStudioRuntimeConfig
 } from "../utils/env";
 import type {
   GuideInitializationRequirement,
@@ -167,6 +175,11 @@ export interface GuideLogicOptions {
    * Optional OpenClaw config refresher used by tests and initialization flows.
    */
   openClawConfigRefresher?: GuideOpenClawConfigRefresher;
+
+  /**
+   * Optional Studio configuration adapter used by tests and initialization flows.
+   */
+  studioConfigAdapter?: StudioConfigAdapter;
 }
 
 /**
@@ -246,6 +259,7 @@ export class DefaultGuideLogic implements GuideLogic {
   private readonly commandRunner: GuideCommandRunner;
   private readonly gatewayConnector?: GuideLogicOptions["gatewayConnector"];
   private readonly openClawConfigRefresher?: GuideOpenClawConfigRefresher;
+  private readonly studioConfigAdapter: StudioConfigAdapter;
 
   /**
    * Creates one guide logic instance.
@@ -257,6 +271,11 @@ export class DefaultGuideLogic implements GuideLogic {
     this.commandRunner = options.commandRunner ?? new DefaultGuideCommandRunner();
     this.gatewayConnector = options.gatewayConnector;
     this.openClawConfigRefresher = options.openClawConfigRefresher;
+    this.studioConfigAdapter =
+      options.studioConfigAdapter ??
+      new DefaultStudioConfigAdapter(
+        createStudioDatabasePool(getStudioDatabaseConfig())
+      );
   }
 
   /**
@@ -282,6 +301,12 @@ export class DefaultGuideLogic implements GuideLogic {
   public async getOpenClawConfig(
     options: OpenClawDetectedConfigOptions = {}
   ): Promise<OpenClawDetectedConfig> {
+    const storedConfig = await this.studioConfigAdapter.findStudioConfig();
+
+    if (storedConfig !== undefined) {
+      return storedConfig;
+    }
+
     return readOpenClawDetectedConfig({
       envSource: process.env,
       openClawConfigPath: resolveOpenClawLocalPathsFromEnv(
@@ -304,20 +329,23 @@ export class DefaultGuideLogic implements GuideLogic {
     const localPaths = resolveOpenClawLocalPathsFromEnv(process.env, this.studioRootDir);
     const normalized = normalizeInitializeGuideRequest(request, localPaths);
     const envFilePath = join(this.studioRootDir, ".env");
-    const openClawRootEnvPath = join(normalized.stateDir, ".env");
-    const openClawRootEnvEntries = buildOpenClawRootEnvEntries(normalized);
-    const shouldRefreshOpenClawEnv = await openClawRootEnvEntriesNeedUpdate(
-      openClawRootEnvPath,
-      openClawRootEnvEntries
-    );
 
+    await this.studioConfigAdapter.upsertStudioConfig({
+      kweaver_base_url: normalized.kweaver_base_url ?? "http://bkn-backend-svc:13014",
+      openclaw_address: normalized.openclaw_address,
+      openclaw_token: normalized.openclaw_token
+    });
+    setStudioRuntimeConfig({
+      kweaverBaseUrl: normalized.kweaver_base_url ?? "http://bkn-backend-svc:13014",
+      openClawGatewayUrl: normalized.openclaw_address,
+      openClawGatewayToken: normalized.openclaw_token
+    });
     await writeFile(envFilePath, buildGuideEnvFileContent(normalized), "utf8");
     loadEnvFile({
       path: envFilePath,
       forceReload: true,
       override: true
     });
-    await mergeOpenClawRootEnv(openClawRootEnvPath, openClawRootEnvEntries);
     await this.commandRunner.execFile("npm", ["run", "init:agents"], {
       cwd: this.studioRootDir
     });
@@ -326,9 +354,6 @@ export class DefaultGuideLogic implements GuideLogic {
       token: normalized.openclaw_token,
       connector: this.gatewayConnector
     });
-    if (shouldRefreshOpenClawEnv) {
-      await this.refreshOpenClawRuntimeEnv(normalized);
-    }
   }
 
   /**
@@ -425,6 +450,16 @@ export async function readOpenClawDetectedConfig(options: {
   openClawConfigPath: string;
   requestHost?: string;
 }): Promise<OpenClawDetectedConfig> {
+  const cachedConfig = getStudioRuntimeConfig();
+
+  if (cachedConfig !== undefined) {
+    return {
+      openclaw_address: cachedConfig.openClawGatewayUrl,
+      openclaw_token: cachedConfig.openClawGatewayToken,
+      kweaver_base_url: cachedConfig.kweaverBaseUrl
+    };
+  }
+
   const configuredToken = readOptionalString(options.envSource.OPENCLAW_GATEWAY_TOKEN);
   const openclawAddress =
     configuredToken === undefined
@@ -710,11 +745,10 @@ export function buildGuideEnvEntries(
   request: NormalizedInitializeGuideRequest
 ): ReadonlyArray<readonly [string, string]> {
   return [
-    ["OPENCLAW_GATEWAY_PROTOCOL", request.protocol],
-    ["OPENCLAW_GATEWAY_HOST", request.host],
-    ["OPENCLAW_GATEWAY_PORT", String(request.port)],
-    ["OPENCLAW_GATEWAY_TOKEN", request.token],
-    ["KWEAVER_BASE_URL", request.kweaver_base_url ?? ""]
+    ["PORT", "3000"],
+    ["OPENCLAW_GATEWAY_TIMEOUT_MS", "5000"],
+    ["OAUTH_MOCK_USER_ID", ""],
+    ["KWEAVER_HYDRA_ADMIN_URL", ""]
   ];
 }
 
@@ -734,13 +768,7 @@ export function buildGuideEnvFileContent(
   const lines = [
     `PORT=${encodeEnvValue("3000")}`,
     "",
-    `OPENCLAW_GATEWAY_PROTOCOL=${encodeEnvValue(request.protocol)}`,
-    `OPENCLAW_GATEWAY_HOST=${encodeEnvValue(request.host)}`,
-    `OPENCLAW_GATEWAY_PORT=${encodeEnvValue(String(request.port))}`,
-    `OPENCLAW_GATEWAY_TOKEN=${encodeEnvValue(request.token)}`,
     "OPENCLAW_GATEWAY_TIMEOUT_MS=5000",
-    "",
-    `KWEAVER_BASE_URL=${encodeEnvValue(request.kweaver_base_url ?? "")}`,
     "",
     "OAUTH_MOCK_USER_ID=",
     "KWEAVER_HYDRA_ADMIN_URL=",
@@ -759,11 +787,8 @@ export function buildGuideEnvFileContent(
 export function buildOpenClawRootEnvEntries(
   request: NormalizedInitializeGuideRequest
 ): ReadonlyArray<readonly [string, string]> {
-  return [
-    ["KWEAVER_BASE_URL", request.kweaver_base_url ?? ""],
-    ["KWEAVER_BUSINESS_DOMAIN", "bd_public"],
-    ["KWEAVER_TLS_INSECURE", "1"]
-  ];
+  void request;
+  return [];
 }
 
 /**
@@ -800,12 +825,11 @@ export async function mergeOpenClawRootEnv(
   envFilePath: string,
   entries: ReadonlyArray<readonly [string, string]>
 ): Promise<void> {
-  await mkdir(dirname(envFilePath), { recursive: true });
-  const current = (await pathExists(envFilePath))
-    ? await readFile(envFilePath, "utf8")
-    : "";
-
-  await writeFile(envFilePath, upsertEnvEntries(current, entries), "utf8");
+  void envFilePath;
+  if (entries.length === 0) {
+    return;
+  }
+  throw new Error("Writing Studio connection config to OpenClaw .env is disabled");
 }
 
 /**
@@ -874,31 +898,9 @@ export async function collectMissingRequirements(
   if (!(await pathExists(envFilePath))) {
     return [
       "envFile",
-      "gatewayProtocol",
-      "gatewayHost",
-      "gatewayPort",
-      "gatewayToken",
       "privateKey",
       "publicKey"
     ];
-  }
-
-  const envValues = parseDotEnv(await readFile(envFilePath, "utf8"));
-
-  if (readOptionalString(envValues.OPENCLAW_GATEWAY_PROTOCOL) === undefined) {
-    missing.push("gatewayProtocol");
-  }
-
-  if (readOptionalString(envValues.OPENCLAW_GATEWAY_HOST) === undefined) {
-    missing.push("gatewayHost");
-  }
-
-  if (readOptionalString(envValues.OPENCLAW_GATEWAY_PORT) === undefined) {
-    missing.push("gatewayPort");
-  }
-
-  if (readOptionalString(envValues.OPENCLAW_GATEWAY_TOKEN) === undefined) {
-    missing.push("gatewayToken");
   }
 
   if (!(await pathExists(privateKeyPath))) {

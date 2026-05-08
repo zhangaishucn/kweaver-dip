@@ -16,6 +16,10 @@ OpenClaw 通过 `mcporter` 技能来访问 DIP Studio MCP Server 暴露的工具
 
 DIP Studio MCP Server 提供以下 tools：
 
+#### get_kweaver_base_url
+
+获取 KWeaver 服务连接地址。连接地址需要配合 KWeaver Token 一起使用。
+
 #### get_kweaver_token
 
 获取指定数字员工的 KWeaver Token。业务流程如下：
