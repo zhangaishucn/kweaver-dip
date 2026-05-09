@@ -78,12 +78,12 @@ const InitialConfiguration = () => {
   const getInitializeRequest = (values: GuideInitializeRequest): GuideInitializeRequest => {
     const openclawAddress = values.openclaw_address.trim()
     const openclawToken = values.openclaw_token.trim()
-    const kweaverBaseUrl = values.kweaver_base_url?.trim()
+    const kweaverBaseUrl = values.kweaver_base_url.trim()
 
     return {
       openclaw_address: openclawAddress,
       openclaw_token: openclawToken,
-      ...(kweaverBaseUrl ? { kweaver_base_url: kweaverBaseUrl } : {}),
+      kweaver_base_url: kweaverBaseUrl,
     }
   }
 

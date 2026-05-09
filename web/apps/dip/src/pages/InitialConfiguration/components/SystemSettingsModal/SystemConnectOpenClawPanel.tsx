@@ -4,6 +4,7 @@ import intl from 'react-intl-universal'
 import type { GuideInitializeRequest, OpenClawDetectedConfig } from '@/apis/dip-studio/guide'
 import { getOpenClawDetectedConfig, initializeGuide } from '@/apis/dip-studio/guide'
 import ScrollBarContainer from '@/components/ScrollBarContainer'
+import { DEFAULT_KWEAVER_BASE_URL } from '../../types'
 
 interface SystemConnectOpenClawPanelProps {
   onCancel: () => void
@@ -11,7 +12,11 @@ interface SystemConnectOpenClawPanelProps {
 
 function validateKweaverBaseUrl(_: unknown, value: string | undefined) {
   const v = value?.trim()
-  if (!v) return Promise.resolve()
+  if (!v) {
+    return Promise.reject(
+      new Error(intl.get('initialConfiguration.connect.kweaverBaseUrlRequired')),
+    )
+  }
   try {
     const u = new URL(v)
     if (!['http:', 'https:'].includes(u.protocol)) {
@@ -42,10 +47,12 @@ const SystemConnectOpenClawPanel = ({ onCancel }: SystemConnectOpenClawPanelProp
         form.setFieldsValue({
           openclaw_address: cfg.openclaw_address,
           openclaw_token: cfg.openclaw_token,
-          kweaver_base_url: cfg.kweaver_base_url,
+          kweaver_base_url: cfg.kweaver_base_url ?? DEFAULT_KWEAVER_BASE_URL,
         })
       } catch {
-        // noop: 用户可手动填写
+        form.setFieldsValue({
+          kweaver_base_url: DEFAULT_KWEAVER_BASE_URL,
+        })
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -59,12 +66,12 @@ const SystemConnectOpenClawPanel = ({ onCancel }: SystemConnectOpenClawPanelProp
   const getInitializeRequest = (values: GuideInitializeRequest): GuideInitializeRequest => {
     const openclawAddress = values.openclaw_address.trim()
     const openclawToken = values.openclaw_token.trim()
-    const kweaverBaseUrl = values.kweaver_base_url?.trim()
+    const kweaverBaseUrl = values.kweaver_base_url.trim()
 
     return {
       openclaw_address: openclawAddress,
       openclaw_token: openclawToken,
-      ...(kweaverBaseUrl ? { kweaver_base_url: kweaverBaseUrl } : {}),
+      kweaver_base_url: kweaverBaseUrl,
     }
   }
 

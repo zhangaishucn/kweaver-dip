@@ -16,7 +16,11 @@ interface ConnectOpenClawStepProps {
 
 function validateKweaverBaseUrl(_: unknown, value: string | undefined) {
   const v = value?.trim()
-  if (!v) return Promise.resolve()
+  if (!v) {
+    return Promise.reject(
+      new Error(intl.get('initialConfiguration.connect.kweaverBaseUrlRequired')),
+    )
+  }
   try {
     const u = new URL(v)
     if (!['http:', 'https:'].includes(u.protocol)) {
