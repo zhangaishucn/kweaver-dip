@@ -16,6 +16,7 @@ import type {
   BknKnowledgeNetworkParams,
   BknKnowledgeNetworksListQuery
 } from "../types/bkn";
+import { readOptionalBearerToken } from "./proxy-auth";
 
 /**
  * Resolves `x-business-domain` from an Express request for BKN upstream calls.
@@ -47,7 +48,8 @@ export function createBknRouter(logic: BknLogic = new DefaultBknLogic()): Router
         const businessDomain = readBknBusinessDomainHeader(request);
         const result = await logic.listKnowledgeNetworks(
           request.query,
-          businessDomain
+          businessDomain,
+          readOptionalBearerToken(request)
         );
         writeProxyResponse(response, result);
       } catch (error) {
@@ -69,7 +71,8 @@ export function createBknRouter(logic: BknLogic = new DefaultBknLogic()): Router
         const result = await logic.getKnowledgeNetwork(
           knId,
           request.query,
-          businessDomain
+          businessDomain,
+          readOptionalBearerToken(request)
         );
         writeProxyResponse(response, result);
       } catch (error) {

@@ -1,16 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  applyInsecureTlsSetting,
   buildBknUrl,
   createBknHeaders,
   DEFAULT_BKN_BUSINESS_DOMAIN,
   DefaultBknHttpClient,
-  isHttpsUrlString,
   isSelfSignedCertificateError,
   normalizeBknError,
   resolveBknBusinessDomain
 } from "./bkn-http-client";
+import {
+  applyInsecureTlsSetting,
+  isHttpsUrlString
+} from "./insecure-tls";
 
 describe("buildBknUrl", () => {
   it("joins the base URL, path and query string values", () => {
@@ -138,16 +140,19 @@ describe("DefaultBknHttpClient", () => {
     const client = new DefaultBknHttpClient(
       {
         baseUrl: "http://127.0.0.1:13014",
-        token: "secret",
         timeoutMs: 5000
       },
       fetchImpl
     );
 
     await expect(
-      client.listKnowledgeNetworks({
-        name_pattern: "incident",
-        limit: "20"
+      client.forwardRequest("/api/bkn-backend/v1/knowledge-networks", {
+        method: "GET",
+        query: {
+          name_pattern: "incident",
+          limit: "20"
+        },
+        bearerToken: "secret"
       })
     ).resolves.toEqual({
       status: 200,
@@ -180,13 +185,16 @@ describe("DefaultBknHttpClient", () => {
     const client = new DefaultBknHttpClient(
       {
         baseUrl: "http://127.0.0.1:13014",
-        token: "secret",
         timeoutMs: 5000
       },
       fetchImpl
     );
 
-    await client.getKnowledgeNetwork("kn-1", { include_statistics: "true" }, "bd_other");
+    await client.forwardRequest("/api/bkn-backend/v1/knowledge-networks/kn-1", {
+      method: "GET",
+      query: { include_statistics: "true" },
+      businessDomain: "bd_other"
+    });
 
     expect(fetchImpl.mock.calls[0]?.[0]).toBe(
       "http://127.0.0.1:13014/api/bkn-backend/v1/knowledge-networks/kn-1?include_statistics=true"
@@ -214,7 +222,10 @@ describe("DefaultBknHttpClient", () => {
       fetchImpl
     );
 
-    await client.listKnowledgeNetworks({});
+    await client.forwardRequest("/api/bkn-backend/v1/knowledge-networks", {
+      method: "GET",
+      query: {}
+    });
 
     expect(fetchImpl).toHaveBeenCalled();
     expect(process.env.NODE_TLS_REJECT_UNAUTHORIZED).toBeUndefined();
@@ -236,6 +247,9 @@ describe("DefaultBknHttpClient", () => {
       fetchImpl
     );
 
-    await client.listKnowledgeNetworks({});
+    await client.forwardRequest("/api/bkn-backend/v1/knowledge-networks", {
+      method: "GET",
+      query: {}
+    });
   });
 });

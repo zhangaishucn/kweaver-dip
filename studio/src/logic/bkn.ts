@@ -1,10 +1,10 @@
 import {
-  DefaultBknHttpClient,
-  type BknHttpClient,
-  type BknHttpClientOptions,
-  type BknProxyResponse
-} from "../infra/bkn-http-client";
-import { getEnv } from "../utils/env";
+  DefaultBknAdapter,
+  type BknAdapter,
+  type BknAdapterOptions,
+  type CreateBknHttpClient
+} from "../adapters/bkn-adapter";
+import type { BknProxyResponse } from "../infra/bkn-http-client";
 import type { BknQuery } from "../types/bkn";
 
 /**
@@ -18,7 +18,11 @@ export interface BknLogic {
    * @param businessDomain Upstream `x-business-domain` value.
    * @returns The normalized upstream response.
    */
-  listKnowledgeNetworks(query: BknQuery, businessDomain?: string): Promise<BknProxyResponse>;
+  listKnowledgeNetworks(
+    query: BknQuery,
+    businessDomain?: string,
+    bearerToken?: string
+  ): Promise<BknProxyResponse>;
 
   /**
    * Fetches one BKN knowledge network detail.
@@ -31,36 +35,26 @@ export interface BknLogic {
   getKnowledgeNetwork(
     knId: string,
     query: BknQuery,
-    businessDomain?: string
+    businessDomain?: string,
+    bearerToken?: string
   ): Promise<BknProxyResponse>;
 }
 
 /**
- * Factory used to create a fresh BKN HTTP client for each request.
- */
-export type CreateBknHttpClient = (options: BknHttpClientOptions) => BknHttpClient;
-
-/**
  * Runtime dependencies required by {@link DefaultBknLogic}.
  */
-export interface BknLogicOptions {
+export interface BknLogicOptions extends BknAdapterOptions {
   /**
-   * Optional env reader used to resolve the current BKN client configuration.
+   * Optional adapter override used by tests.
    */
-  getEnv?: typeof getEnv;
-
-  /**
-   * Optional factory used to create the per-request BKN HTTP client.
-   */
-  createClient?: CreateBknHttpClient;
+  adapter?: BknAdapter;
 }
 
 /**
- * Default BKN logic implementation that creates a fresh HTTP client for every request.
+ * Default BKN logic implementation backed by the BKN adapter.
  */
 export class DefaultBknLogic implements BknLogic {
-  private readonly getEnvValue: typeof getEnv;
-  private readonly createClientValue: CreateBknHttpClient;
+  private readonly adapter: BknAdapter;
 
   /**
    * Creates the BKN logic.
@@ -68,9 +62,7 @@ export class DefaultBknLogic implements BknLogic {
    * @param options Optional dependency overrides for tests.
    */
   public constructor(options: BknLogicOptions = {}) {
-    this.getEnvValue = options.getEnv ?? getEnv;
-    this.createClientValue = options.createClient ?? ((clientOptions) =>
-      new DefaultBknHttpClient(clientOptions));
+    this.adapter = options.adapter ?? new DefaultBknAdapter(options);
   }
 
   /**
@@ -82,9 +74,10 @@ export class DefaultBknLogic implements BknLogic {
    */
   public async listKnowledgeNetworks(
     query: BknQuery,
-    businessDomain?: string
+    businessDomain?: string,
+    bearerToken?: string
   ): Promise<BknProxyResponse> {
-    return this.createClient().listKnowledgeNetworks(query, businessDomain);
+    return this.adapter.listKnowledgeNetworks(query, businessDomain, bearerToken);
   }
 
   /**
@@ -98,23 +91,11 @@ export class DefaultBknLogic implements BknLogic {
   public async getKnowledgeNetwork(
     knId: string,
     query: BknQuery,
-    businessDomain?: string
+    businessDomain?: string,
+    bearerToken?: string
   ): Promise<BknProxyResponse> {
-    return this.createClient().getKnowledgeNetwork(knId, query, businessDomain);
-  }
-
-  /**
-   * Builds a fresh BKN HTTP client from the current environment snapshot.
-   *
-   * @returns A newly created BKN HTTP client instance.
-   */
-  private createClient(): BknHttpClient {
-    const env = this.getEnvValue();
-
-    return this.createClientValue({
-      baseUrl: env.bknBackendUrl,
-      token: env.appUserToken,
-      timeoutMs: env.openClawGatewayTimeoutMs
-    });
+    return this.adapter.getKnowledgeNetwork(knId, query, businessDomain, bearerToken);
   }
 }
+
+export type { CreateBknHttpClient };

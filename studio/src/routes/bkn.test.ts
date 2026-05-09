@@ -116,7 +116,8 @@ describe("createBknRouter", () => {
 
     expect(logic.listKnowledgeNetworks).toHaveBeenCalledWith(
       { limit: "10" },
-      DEFAULT_BKN_BUSINESS_DOMAIN
+      DEFAULT_BKN_BUSINESS_DOMAIN,
+      undefined
     );
     expect(response.setHeader).toHaveBeenCalledWith(
       "content-type",
@@ -154,7 +155,8 @@ describe("createBknRouter", () => {
       {
         include_statistics: "true"
       },
-      DEFAULT_BKN_BUSINESS_DOMAIN
+      DEFAULT_BKN_BUSINESS_DOMAIN,
+      undefined
     );
     expect(response.status).toHaveBeenCalledWith(200);
   });
@@ -180,7 +182,40 @@ describe("createBknRouter", () => {
       next
     );
 
-    expect(logic.listKnowledgeNetworks).toHaveBeenCalledWith({}, "bd_tenant_a");
+    expect(logic.listKnowledgeNetworks).toHaveBeenCalledWith(
+      {},
+      "bd_tenant_a",
+      undefined
+    );
+  });
+
+  it("forwards bearer tokens to the BKN client", async () => {
+    const logic = createLogicDouble();
+    vi.mocked(logic.listKnowledgeNetworks).mockResolvedValue({
+      status: 200,
+      headers: new Headers(),
+      body: "{}"
+    });
+    const router = createBknRouter(logic) as Router;
+    const handler = findHandler(router, "get", collectionPath);
+    const response = createResponseDouble();
+    const next = vi.fn<NextFunction>();
+
+    await handler?.(
+      {
+        query: {},
+        headers: { authorization: "Bearer user-token" }
+      } as unknown as Request,
+      response,
+      next
+    );
+
+    expect(logic.listKnowledgeNetworks).toHaveBeenCalledWith(
+      {},
+      DEFAULT_BKN_BUSINESS_DOMAIN,
+      "user-token"
+    );
+    expect(next).not.toHaveBeenCalled();
   });
 
   it("rejects empty kn_id values", async () => {

@@ -4,17 +4,19 @@ import { HttpError } from "./errors/http-error";
 import { errorHandler } from "./middleware/error-handler";
 import { createHydraAuthMiddleware } from "./middleware/hydra-auth";
 import { notFoundHandler } from "./middleware/not-found";
+import { createAuthorizationRouter } from "./routes/authorization";
 import { createBknRouter } from "./routes/bkn";
 import { createChatRouter } from "./routes/chat";
-import { createCronRouter } from "./routes/plan";
 import { createChatAgentRouter } from "./routes/chat-agent";
 import { createChatUploadRouter } from "./routes/chat-upload";
 import { createChannelUserRouter } from "./routes/channel-user";
+import { createCronRouter } from "./routes/plan";
 import { createDigitalHumanRouter } from "./routes/digital-human";
 import { createHealthRouter } from "./routes/health";
 import { createGuideRouter } from "./routes/guide";
 import { createSessionsRouter } from "./routes/sessions";
 import { createSkillsRouter } from "./routes/skills";
+import { createUserManagementRouter } from "./routes/user-management";
 
 
 /**
@@ -56,6 +58,8 @@ export function createApp(options: AppOptions = {}): Express {
   app.use(createHealthRouter());
   app.use(createGuideRouter());
   app.use(createBknRouter());
+  app.use(createUserManagementRouter());
+  app.use(createAuthorizationRouter());
   app.use(createCronRouter());
   app.use(createChatRouter());
   app.use(createSessionsRouter());

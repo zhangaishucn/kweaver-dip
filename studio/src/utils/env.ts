@@ -121,6 +121,7 @@ export function resolvePort(value: string | undefined): number {
 export function getEnv(): {
   port: number;
   bknBackendUrl: string;
+  kweaverBaseUrl: string;
   appUserToken?: string;
   hydraAdminUrl: string;
   isDevelopment: boolean;
@@ -143,11 +144,14 @@ export function getEnv(): {
     readOptionalString(process.env.OPENCLAW_GATEWAY_URL) ??
     buildGatewayUrl(gatewayProtocol, gatewayHost, gatewayPort);
 
+  const kweaverBaseUrl = resolveBknBackendUrl(
+    studioRuntimeConfig?.kweaverBaseUrl ?? process.env.KWEAVER_BASE_URL
+  );
+
   return {
     port: resolvePort(process.env.PORT),
-    bknBackendUrl: resolveBknBackendUrl(
-      studioRuntimeConfig?.kweaverBaseUrl ?? process.env.KWEAVER_BASE_URL
-    ),
+    bknBackendUrl: kweaverBaseUrl,
+    kweaverBaseUrl,
     appUserToken: readOptionalString(process.env.KWEAVER_TOKEN),
     hydraAdminUrl: resolveHydraAdminUrl(process.env.KWEAVER_HYDRA_ADMIN_URL),
     isDevelopment: isDevelopmentMode(process.env.NODE_ENV),

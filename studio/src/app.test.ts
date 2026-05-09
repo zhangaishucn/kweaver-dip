@@ -961,6 +961,7 @@ describe("getEnv", () => {
     expect(getEnv()).toEqual({
       port: 4321,
       bknBackendUrl: "http://127.0.0.1:13014/",
+      kweaverBaseUrl: "http://127.0.0.1:13014/",
       appUserToken: undefined,
       hydraAdminUrl: "http://127.0.0.1:4445/",
       isDevelopment: false,
@@ -988,6 +989,7 @@ describe("getEnv", () => {
 
     expect(getEnv()).toMatchObject({
       bknBackendUrl: "https://core.example.com/",
+      kweaverBaseUrl: "https://core.example.com/",
       appUserToken: "token-1",
       hydraAdminUrl: "https://hydra.example.com/",
       isDevelopment: true,

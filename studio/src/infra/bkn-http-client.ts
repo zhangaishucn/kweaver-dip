@@ -1,5 +1,9 @@
 import { HttpError } from "../errors/http-error";
 import type { BknQuery } from "../types/bkn";
+import {
+  applyInsecureTlsSetting,
+  isHttpsUrlString
+} from "./insecure-tls";
 
 /**
  * Default upstream `x-business-domain` when the inbound request omits the header.
@@ -14,11 +18,6 @@ export interface BknHttpClientOptions {
    * Base URL of the upstream BKN backend.
    */
   baseUrl: string;
-
-  /**
-   * Optional bearer token used for outbound authorization.
-   */
-  token?: string;
 
   /**
    * Request timeout in milliseconds.
@@ -52,28 +51,48 @@ export interface BknProxyResponse {
 }
 
 /**
- * Defines the BKN operations exposed by the proxy client.
+ * HTTP methods currently needed by the BKN proxy.
+ */
+export type BknHttpMethod = "GET";
+
+/**
+ * Per-request BKN forwarding options.
+ */
+export interface BknForwardRequestOptions {
+  /**
+   * HTTP method.
+   */
+  method: BknHttpMethod;
+
+  /**
+   * Optional query string values.
+   */
+  query?: BknQuery;
+
+  /**
+   * Optional upstream `x-business-domain` value.
+   */
+  businessDomain?: string;
+
+  /**
+   * Optional bearer token from the incoming Studio request.
+   */
+  bearerToken?: string;
+}
+
+/**
+ * Defines the generic BKN forwarding capability used by adapters.
  */
 export interface BknHttpClient {
   /**
-   * Forwards the list request.
+   * Forwards one request to the BKN backend.
    *
-   * @param query Incoming query string values.
-   * @param businessDomain Upstream `x-business-domain` value (already resolved, including default).
+   * @param path Upstream API path.
+   * @param options Request forwarding options.
    */
-  listKnowledgeNetworks(query: BknQuery, businessDomain?: string): Promise<BknProxyResponse>;
-
-  /**
-   * Forwards the detail request.
-   *
-   * @param knId Knowledge network id.
-   * @param query Incoming query string values.
-   * @param businessDomain Upstream `x-business-domain` value (already resolved, including default).
-   */
-  getKnowledgeNetwork(
-    knId: string,
-    query: BknQuery,
-    businessDomain?: string
+  forwardRequest(
+    path: string,
+    options: BknForwardRequestOptions
   ): Promise<BknProxyResponse>;
 }
 
@@ -93,58 +112,15 @@ export class DefaultBknHttpClient implements BknHttpClient {
   ) {}
 
   /**
-   * Forwards the list request.
-   *
-   * @param query Incoming query string values.
-   * @returns The normalized upstream response.
-   */
-  public async listKnowledgeNetworks(
-    query: BknQuery,
-    businessDomain?: string
-  ): Promise<BknProxyResponse> {
-    return this.forwardRequest(
-      "/api/bkn-backend/v1/knowledge-networks",
-      "GET",
-      query,
-      businessDomain
-    );
-  }
-
-  /**
-   * Forwards the detail request.
-   *
-   * @param knId Knowledge network id.
-   * @param query Incoming query string values.
-   * @param businessDomain Upstream `x-business-domain` value.
-   * @returns The normalized upstream response.
-   */
-  public async getKnowledgeNetwork(
-    knId: string,
-    query: BknQuery,
-    businessDomain?: string
-  ): Promise<BknProxyResponse> {
-    return this.forwardRequest(
-      `/api/bkn-backend/v1/knowledge-networks/${encodeURIComponent(knId)}`,
-      "GET",
-      query,
-      businessDomain
-    );
-  }
-
-  /**
    * Executes one outbound request against the configured BKN backend.
    *
    * @param path Upstream path.
-   * @param method HTTP method.
-   * @param query Optional query string values.
-   * @param businessDomain Optional upstream `x-business-domain` (defaults when empty).
+   * @param options Request forwarding options.
    * @returns The normalized upstream response.
    */
-  private async forwardRequest(
+  public async forwardRequest(
     path: string,
-    method: "GET",
-    query?: BknQuery,
-    businessDomain?: string
+    options: BknForwardRequestOptions
   ): Promise<BknProxyResponse> {
     const controller = new AbortController();
     const timeout = setTimeout(
@@ -152,8 +128,8 @@ export class DefaultBknHttpClient implements BknHttpClient {
       this.options.timeoutMs
     ).unref();
 
-    const url = buildBknUrl(this.options.baseUrl, path, query);
-    const headers = createBknHeaders(this.options.token, businessDomain);
+    const url = buildBknUrl(this.options.baseUrl, path, options.query);
+    const headers = createBknHeaders(options.bearerToken, options.businessDomain);
 
     const restoreTlsVerification = isHttpsUrlString(url)
       ? applyInsecureTlsSetting()
@@ -161,7 +137,7 @@ export class DefaultBknHttpClient implements BknHttpClient {
 
     try {
       const response = await this.fetchImpl(url, {
-        method,
+        method: options.method,
         headers,
         signal: controller.signal
       }).catch((error: unknown) => {
@@ -180,38 +156,6 @@ export class DefaultBknHttpClient implements BknHttpClient {
       clearTimeout(timeout);
     }
   }
-}
-
-/**
- * Returns whether a URL string uses the HTTPS scheme.
- *
- * @param urlString Absolute URL string.
- * @returns True when the protocol is `https:`.
- */
-export function isHttpsUrlString(urlString: string): boolean {
-  return new URL(urlString).protocol === "https:";
-}
-
-/**
- * Temporarily disables TLS certificate verification for the current process.
- *
- * Node's `fetch` does not expose per-request TLS options; BKN upstream HTTPS calls use this for
- * self-signed backends. The prior value is restored immediately after the response body is read.
- *
- * @returns A callback that restores previous TLS verification behavior.
- */
-export function applyInsecureTlsSetting(): () => void {
-  const previous = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-
-  return () => {
-    if (previous === undefined) {
-      delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-      return;
-    }
-
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED = previous;
-  };
 }
 
 /**
