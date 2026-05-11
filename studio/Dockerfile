@@ -4,16 +4,22 @@ FROM node:25.9-bookworm AS builder
 
 WORKDIR /build
 
-COPY . .
+COPY .gitignore mcporter.json package.json pnpm-lock.yaml tsconfig.build.json tsconfig.json ./
+COPY assets ./assets
+COPY built-in ./built-in
+COPY extensions ./extensions
+COPY scripts ./scripts
+COPY src ./src
+COPY templates ./templates
 
 # Bundled OpenClaw plugin: copy deploy/openclaw-extensions/dip into studio/extensions/dip
 # before docker build (see README); CI does this automatically.
-RUN test -d extensions/dip \
-  || (echo "ERROR: extensions/dip is missing. From monorepo root: mkdir -p studio/extensions && cp -R deploy/openclaw-extensions/dip studio/extensions/dip" >&2; exit 1)
+#RUN test -d extensions/dip \
+#  || (echo "ERROR: extensions/dip is missing. From monorepo root: mkdir -p studio/extensions && cp -R deploy/openclaw-extensions/dip studio/extensions/dip" >&2; exit 1)
 
 RUN npm config set registry https://registry.npmmirror.com \
-    && npm install -g pnpm \
-    && pnpm install \
+    && npm install -g pnpm@10.28.2 \
+    && pnpm install --frozen-lockfile \
     && pnpm run build \
     && pnpm prune --prod
 
