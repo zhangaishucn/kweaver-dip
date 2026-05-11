@@ -21,6 +21,16 @@ vi.mock('@/components/ScrollBarContainer', () => ({
   ),
 }))
 
+vi.mock('antd', async () => {
+  const actual = await vi.importActual<typeof import('antd')>('antd')
+  return {
+    ...actual,
+    Tooltip: ({ children, title }: { children: React.ReactNode; title: React.ReactNode }) => (
+      <span title={String(title)}>{children}</span>
+    ),
+  }
+})
+
 const mockedGetBknKnowledgeNetworks = vi.mocked(getBknKnowledgeNetworks)
 
 describe('DigitalHumanSetting/KnowledgeConfig/SelectKnowledgeModal', () => {
@@ -33,12 +43,22 @@ describe('DigitalHumanSetting/KnowledgeConfig/SelectKnowledgeModal', () => {
       id: 'bkn-1',
       name: '产品知识库',
       comment: '这是产品相关的知识',
+      statistics: {
+        object_types_total: 11,
+        relation_types_total: 12,
+        action_types_total: 13,
+      },
       update_time: 1715136000,
     },
     {
       id: 'bkn-2',
       name: '技术知识库',
       comment: '这是技术相关的知识',
+      statistics: {
+        object_types_total: 21,
+        relation_types_total: 22,
+        action_types_total: 23,
+      },
       update_time: 1715136000,
     },
   ]
@@ -57,6 +77,16 @@ describe('DigitalHumanSetting/KnowledgeConfig/SelectKnowledgeModal', () => {
     expect(await screen.findAllByText('产品知识库')).toHaveLength(2) // AppIcon 和标题
     expect(await screen.findAllByText('技术知识库')).toHaveLength(2)
     expect(screen.getByText('这是产品相关的知识')).toBeInTheDocument()
+    expect(mockedGetBknKnowledgeNetworks).toHaveBeenCalledWith({
+      limit: -1,
+      include_statistics: true,
+    })
+    expect(screen.getByText('11')).toBeInTheDocument()
+    expect(screen.getByText('12')).toBeInTheDocument()
+    expect(screen.getByText('13')).toBeInTheDocument()
+    expect(screen.getAllByTitle('对象类')).toHaveLength(2)
+    expect(screen.getAllByTitle('关系类')).toHaveLength(2)
+    expect(screen.getAllByTitle('行动类')).toHaveLength(2)
   })
 
   it('显示空状态当没有知识', async () => {

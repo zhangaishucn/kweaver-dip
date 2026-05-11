@@ -38,6 +38,11 @@ export interface BknKnowledgeNetworksListQuery {
    * Exact tag filter.
    */
   tag?: string;
+
+  /**
+   * Whether Studio should enrich list entries with concept statistics.
+   */
+  include_statistics?: string;
 }
 
 /**

@@ -1,7 +1,7 @@
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import { AddOutlined, ToolColored } from './index'
+import { AddOutlined, BknObjectTypeOutlined, ToolColored } from './index'
 import { IconBase } from './shared/IconBase'
 import type { ColoredIconProps, OutlinedIconProps } from './index'
 
@@ -35,6 +35,7 @@ describe('@kweaver-web/icons', () => {
 
   it('exports generated outlined and colored icons', () => {
     expect(AddOutlined).toBeTypeOf('function')
+    expect(BknObjectTypeOutlined).toBeTypeOf('function')
     expect(ToolColored).toBeTypeOf('function')
   })
 

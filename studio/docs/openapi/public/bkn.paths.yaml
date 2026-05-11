@@ -40,6 +40,11 @@
         in: query
         schema:
           type: string
+      - name: include_statistics
+        in: query
+        schema:
+          type: boolean
+        description: 是否为每个业务知识网络条目补充对象类、关系类、行动类数量统计；默认 `false`。
     responses:
       '200':
         description: 业务知识网络列表

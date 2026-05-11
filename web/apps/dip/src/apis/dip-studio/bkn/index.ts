@@ -2,6 +2,7 @@ import { get } from '@/utils/http'
 import type {
   BknKnowledgeNetworkDetail,
   BknKnowledgeNetworkInfo,
+  BknKnowledgeNetworkStatistics,
   BknKnowledgeNetworksListResponse,
   GetBknKnowledgeNetworkDetailParams,
   GetBknKnowledgeNetworksParams,
@@ -10,6 +11,7 @@ import type {
 export type {
   BknKnowledgeNetworkDetail,
   BknKnowledgeNetworkInfo,
+  BknKnowledgeNetworkStatistics,
   BknKnowledgeNetworksDirection,
   BknKnowledgeNetworksListResponse,
   BknKnowledgeNetworksSortField,
@@ -44,8 +46,38 @@ function normalizeKnowledgeNetwork(item: Record<string, unknown>): BknKnowledgeN
     comment: typeof item.comment === 'string' ? item.comment : undefined,
     icon: typeof item.icon === 'string' ? item.icon : undefined,
     color: typeof item.color === 'string' ? item.color : undefined,
+    statistics: normalizeStatistics(item.statistics),
     update_time: Number.isFinite(parsedUpdateTime) ? parsedUpdateTime : undefined,
   }
+}
+
+function normalizeStatistics(value: unknown): BknKnowledgeNetworkStatistics | undefined {
+  if (!value || typeof value !== 'object') return undefined
+
+  const statistics = value as Record<string, unknown>
+  const objectTypesTotal = normalizeCount(
+    statistics.object_types_total ?? statistics.object_type_totals,
+  )
+  const relationTypesTotal = normalizeCount(
+    statistics.relation_types_total ?? statistics.relation_type_totals,
+  )
+  const actionTypesTotal = normalizeCount(
+    statistics.action_types_total ?? statistics.action_type_totals,
+  )
+
+  return {
+    object_types_total: objectTypesTotal,
+    relation_types_total: relationTypesTotal,
+    action_types_total: actionTypesTotal,
+  }
+}
+
+function normalizeCount(value: unknown): number | undefined {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : undefined
+  if (typeof value !== 'string' || value.trim() === '') return undefined
+
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : undefined
 }
 
 /** 获取业务知识网络列表（GET /knowledge-networks） */

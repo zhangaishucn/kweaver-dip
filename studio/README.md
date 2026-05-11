@@ -688,6 +688,7 @@ BknEntry 字段：
 | offset | integer | 分页起始偏移量；须 ≥ 0；默认 `0`。 |
 | limit | integer | 每页最大条数；分页可取 `1`–`1000`，`-1` 表示不分页；默认 `10`。 |
 | tag | string | 按标签精确匹配；默认为空。 |
+| include_statistics | boolean | 是否为每个业务知识网络条目补充对象类、关系类、行动类数量统计；默认 `false`。 |
 
 `GET /api/dip-studio/v1/knowledge-networks/{kn_id}`
 

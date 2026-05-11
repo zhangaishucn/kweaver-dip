@@ -9,6 +9,13 @@ export interface GetBknKnowledgeNetworksParams {
   offset?: number
   limit?: number
   tag?: string
+  include_statistics?: boolean
+}
+
+export interface BknKnowledgeNetworkStatistics {
+  object_types_total?: number
+  relation_types_total?: number
+  action_types_total?: number
 }
 
 export interface BknKnowledgeNetworkInfo {
@@ -17,6 +24,7 @@ export interface BknKnowledgeNetworkInfo {
   comment?: string
   icon?: string
   color?: string
+  statistics?: BknKnowledgeNetworkStatistics
   update_time?: number
   [key: string]: unknown
 }

@@ -1,5 +1,5 @@
 import type { ModalProps } from 'antd'
-import { Checkbox, Modal, Spin, Tabs } from 'antd'
+import { Checkbox, Modal, Spin, Tabs, Tooltip } from 'antd'
 import clsx from 'clsx'
 import { useEffect, useState } from 'react'
 import intl from 'react-intl-universal'
@@ -9,6 +9,11 @@ import Empty from '@/components/Empty'
 import ScrollBarContainer from '@/components/ScrollBarContainer'
 import { LoadStatus } from '@/types/enums'
 import { formatTimeSlash } from '@/utils/handle-function/FormatTime'
+import {
+  BknActionTypeOutlined,
+  BknObjectTypeOutlined,
+  BknRelationTypeOutlined,
+} from './BknKnowledgeStatistics'
 
 export interface SelectKnowledgeModalProps extends Omit<ModalProps, 'onCancel' | 'onOk'> {
   /** 确定成功的回调，传递信息 */
@@ -39,7 +44,7 @@ const SelectKnowledgeModal = ({
     if (status === LoadStatus.Loading) return // 防止重复请求
     setStatus(LoadStatus.Loading)
     try {
-      const result = await getBknKnowledgeNetworks({ limit: -1 })
+      const result = await getBknKnowledgeNetworks({ limit: -1, include_statistics: true })
       setKnowledgeList(result.entries)
       setStatus(result.total_count > 0 ? LoadStatus.Normal : LoadStatus.Empty)
     } catch {
@@ -137,9 +142,28 @@ const SelectKnowledgeModal = ({
 
               <div className="mt-auto">
                 <div className="mb-2 h-px bg-[--dip-line-color-10]" />
-                <div className="text-right text-xs font-normal leading-6 text-[--dip-text-color-65]">
-                  {intl.get('digitalHuman.knowledgeModal.updatedPrefix')}
-                  {formatTimeSlash(item.update_time || '') || '--'}
+                <div className="flex items-center justify-between gap-2 text-xs font-normal leading-6 text-[--dip-text-color-65]">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <StatisticItem
+                      icon={<BknObjectTypeOutlined size={14} />}
+                      tooltip="对象类"
+                      value={item.statistics?.object_types_total}
+                    />
+                    <StatisticItem
+                      icon={<BknRelationTypeOutlined size={14} />}
+                      tooltip="关系类"
+                      value={item.statistics?.relation_types_total}
+                    />
+                    <StatisticItem
+                      icon={<BknActionTypeOutlined size={14} />}
+                      tooltip="行动类"
+                      value={item.statistics?.action_types_total}
+                    />
+                  </div>
+                  <div className="min-w-0 truncate text-right">
+                    {intl.get('digitalHuman.knowledgeModal.updatedPrefix')}
+                    {formatTimeSlash(item.update_time || '') || '--'}
+                  </div>
                 </div>
               </div>
             </button>
@@ -205,5 +229,22 @@ const SelectKnowledgeModal = ({
     </Modal>
   )
 }
+
+const StatisticItem = ({
+  icon,
+  tooltip,
+  value,
+}: {
+  icon: React.ReactNode
+  tooltip: string
+  value?: number
+}) => (
+  <span className="inline-flex items-center gap-0.5 text-[--dip-text-color-65]">
+    <Tooltip title={tooltip}>
+      <span className="inline-flex text-[14px]">{icon}</span>
+    </Tooltip>
+    <span>{value ?? 0}</span>
+  </span>
+)
 
 export default SelectKnowledgeModal
