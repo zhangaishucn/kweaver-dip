@@ -482,4 +482,4 @@ where not exists (select f_id from kweaver.t_flow_dag_accessor where f_id = 6172
 INSERT INTO kweaver.t_bd_resource_r
 (created_at, updated_at, deleted_at, f_bd_id, f_resource_id, f_resource_type, f_create_by)
 select '2026-04-24 09:17:22.061', '2026-04-24 09:17:22.061', NULL, 'bd_public', '616502025026315947:default', 'data_flow', '-' from DUAL
-where not exists (select f_id from kweaver.t_bd_resource_r where f_resource_id = '616502025026315947:default' and f_resource_type = 'data_flow');
+where not exists (select 1 from kweaver.t_bd_resource_r where f_resource_id = '616502025026315947:default' and f_resource_type = 'data_flow');
