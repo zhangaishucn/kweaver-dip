@@ -19,28 +19,50 @@
 - 质量保证：单元测试行覆盖率必须达到 90% 以上。
 - 同步机制：每次对 routes 进行更新时，必须同步更新 `docs/openapi` 下的对应文档，并更新 `README.md` 中的 API 部分。
 
-## 二、文档结构
+## 二、项目结构
 
 ```text
-AGENTS.md（本文档）                   项目的基本要求
-ARCHITECTURE.md                     项目的工程结构
-docs/                               项目相关的文档
-├── design/                         设计文档（只读）
-│   ├── product/                    产品设计
-│   ├── implementation/             实现设计
-├── openapi/                        本服务对外提供的 API
-├── references/                     参考文档
-│   ├── openapi/                    项目中使用到的外部 API
-│   ├── openclaw-websocket-rpc/     OpenClaw WebScoket RPC 接口
-├── src/                            源代码
+.
+├── AGENTS.md                         # 项目的基本要求
+├── package.json                      # npm 脚本与依赖定义，包含 dev:mcp 与 mcp 启动脚本
+├── mcporter.json                     # 本地 mcporter 默认配置，注册 dip-studio MCP 服务
+├── Dockerfile                        # 容器构建配置，内置 mcporter 与默认 MCP 配置
+├── docs/                             # 项目相关的文档
+│   ├── openapi/                      # 本服务对外提供的 API
+│   └── references/                   # 参考文档
+│       ├── openapi/                  # 项目中使用到的外部 API
+│       └── openclaw-websocket-rpc/   # OpenClaw WebScoket RPC 接口
+├── scripts/                          # 运行、初始化与部署辅助脚本
+│   ├── docker-entrypoint.sh          # 容器入口，启动 HTTP 服务与 MCP 服务
+│   └── init_agents/                  # 数字员工初始化脚本，同步 dip-studio MCP 到 mcporter 配置
+├── chart/                            # Helm 部署配置，暴露 HTTP 与 MCP 服务端口和 Ingress 路径
+└── src/                              # 源代码
+    ├── app.ts                        # 组装 Express 应用、中间件和路由
+    ├── server.ts                     # 读取环境变量并启动 HTTP 服务
+    ├── mcp-server.ts                 # 启动 DIP Studio MCP 服务，固定监听 3001 端口
+    ├── mcp/                          # MCP Streamable HTTP 应用与工具注册
+    │   ├── app.ts                    # 创建 MCP Express 应用
+    │   └── tools.ts                  # 注册 MCP 工具
+    ├── utils/                        # 通用工具与运行时配置解析
+    ├── infra/                        # 基础设施适配层，例如 OpenClaw Gateway WebSocket 客户端
+    ├── adapters/                     # 外部资源适配器，基于端口接口整合具体依赖调用
+    ├── routes/                       # HTTP 路由定义
+    ├── logic/                        # 核心业务逻辑，包含 MCP 工具对应的业务逻辑
+    ├── middleware/                   # 通用中间件，例如 404 和错误处理
+    ├── errors/                       # 领域内可复用的错误类型
+    ├── scripts/                      # 系统初始化脚本
+    └── *.test.ts                     # 单元测试与接口测试
 ```
+
+当前后端服务采用 Express + TypeScript 的分层脚手架。
 
 ## 三、开发流程与限制
 
-- 架构核对：编写代码前，先读取 `ARCHITECTURE.md` 确认项目结构。
+- 架构核对：编写代码前，先阅读本文档的项目结构确认目录职责。
 - 接口规范：编写 HTTP 接口层代码前，必须先检查 `docs/openapi` 下的 OpenAPI Schema 定义，更新 `src/types` 中的接口定义，再编写实现。
 - Git 工作流：涉及生成、校验或更新 commit message、PR title、PR description、PR 模板或创建 PR 时，必须先读取并遵循 `skills/git-workflow/SKILL.md`。
 - 设计锁定（硬限制）：`docs/design` 目录下的文档是系统设计的来源，不允许修改该目录下的任何内容。
+- 更新 README 和 OpenAPI 文档 时，只描述用户使用相关的接口，不包含实现细节。
 
 ## 四、LLM 行为准则（Merged Guidelines）
 
