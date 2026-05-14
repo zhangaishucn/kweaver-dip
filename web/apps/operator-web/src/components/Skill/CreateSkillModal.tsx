@@ -1,23 +1,38 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import intl from 'react-intl-universal';
 import type { UploadFile, UploadProps } from 'antd';
 import { Form, Modal, Select, Upload, message } from 'antd';
 import { CloudUploadOutlined } from '@ant-design/icons';
-import { getOperatorCategory, postSkill } from '@/apis/agent-operator-integration';
+import { getOperatorCategory, postSkill, putSkillPackage } from '@/apis/agent-operator-integration';
+import { useMicroWidgetProps } from '@/hooks';
 
 const { Dragger } = Upload;
 
 interface CreateSkillModalProps {
   onCancel: () => void;
   onOk: () => void;
+  mode?: 'create' | 'updatePackage';
+  skillId?: string;
 }
 
-export default function CreateSkillModal({ onCancel, onOk }: CreateSkillModalProps) {
+export default function CreateSkillModal({
+  onCancel,
+  onOk,
+  mode = 'create',
+  skillId = '',
+}: CreateSkillModalProps) {
+  const microWidgetProps = useMicroWidgetProps();
   const [category, setCategory] = useState('');
   const [categoryOptions, setCategoryOptions] = useState<any[]>([]);
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const isCreateMode = mode === 'create';
 
   useEffect(() => {
+    if (!isCreateMode) {
+      return;
+    }
+
     const fetchCategoryOptions = async () => {
       try {
         const data = await getOperatorCategory();
@@ -31,7 +46,7 @@ export default function CreateSkillModal({ onCancel, onOk }: CreateSkillModalPro
     };
 
     fetchCategoryOptions();
-  }, []);
+  }, [isCreateMode]);
 
   const getImportType = (file?: File) => {
     if (!file) {
@@ -52,17 +67,20 @@ export default function CreateSkillModal({ onCancel, onOk }: CreateSkillModalPro
 
   const handleConfirm = async () => {
     const currentFile = fileList[0]?.originFileObj;
-    if (!category) {
-      message.info('请选择类型');
+
+    if (isCreateMode && !category) {
+      message.info(intl.get('skill.selectCategory'));
       return;
     }
+
     if (!currentFile) {
-      message.info('请选择文件');
+      message.info(intl.get('skill.selectFile'));
       return;
     }
+
     const importType = getImportType(currentFile);
     if (!importType) {
-      message.info('仅支持导入 .zip 文件或 SKILL.md 文件');
+      message.info(intl.get('skill.unsupportedFile'));
       return;
     }
 
@@ -71,9 +89,15 @@ export default function CreateSkillModal({ onCancel, onOk }: CreateSkillModalPro
       const formData = new FormData();
       formData.append('file', currentFile);
       formData.append('file_type', importType);
-      formData.append('category', category);
-      await postSkill(formData);
-      message.success('导入 Skill 成功');
+
+      if (isCreateMode) {
+        formData.append('category', category);
+        await postSkill(formData);
+      } else {
+        await putSkillPackage(skillId, formData);
+      }
+
+      message.success(intl.get(isCreateMode ? 'skill.importSuccess' : 'skill.updatePackageSuccess'));
       onOk();
     } catch (error: any) {
       if (error?.description) {
@@ -86,7 +110,7 @@ export default function CreateSkillModal({ onCancel, onOk }: CreateSkillModalPro
 
   const handleBeforeUpload: UploadProps['beforeUpload'] = file => {
     if (!getImportType(file as File)) {
-      message.info('仅支持导入 .zip 文件或 SKILL.md 文件');
+      message.info(intl.get('skill.unsupportedFile'));
       return Upload.LIST_IGNORE;
     }
 
@@ -98,15 +122,16 @@ export default function CreateSkillModal({ onCancel, onOk }: CreateSkillModalPro
       open
       centered
       width={640}
-      title="导入Skill"
-      okText="确定"
-      cancelText="取消"
+      title={intl.get(isCreateMode ? 'skill.importTitle' : 'skill.updatePackageTitle')}
+      okText={intl.get('adminManagement.confirm')}
+      cancelText={intl.get('adminManagement.cancel')}
       maskClosable={false}
       confirmLoading={submitting}
       okButtonProps={{ className: 'dip-w-74' }}
       cancelButtonProps={{ className: 'dip-w-74' }}
       onCancel={onCancel}
       onOk={handleConfirm}
+      getContainer={() => microWidgetProps.container}
       footer={(_, { OkBtn, CancelBtn }) => (
         <>
           <OkBtn />
@@ -115,18 +140,20 @@ export default function CreateSkillModal({ onCancel, onOk }: CreateSkillModalPro
       )}
     >
       <Form layout="vertical">
-        <Form.Item label="类型" required>
-          <Select
-            value={category}
-            placeholder="请选择类型"
-            options={categoryOptions?.map((item: any) => ({
-              label: item.name,
-              value: item.category_type,
-            }))}
-            onChange={setCategory}
-          />
-        </Form.Item>
-        <Form.Item label="文件" required>
+        {isCreateMode && (
+          <Form.Item label={intl.get('skill.category')} required>
+            <Select
+              value={category}
+              placeholder={intl.get('skill.selectCategory')}
+              options={categoryOptions?.map((item: any) => ({
+                label: item.name,
+                value: item.category_type,
+              }))}
+              onChange={setCategory}
+            />
+          </Form.Item>
+        )}
+        <Form.Item label={intl.get('skill.file')} required>
           <Dragger
             accept=".zip,.md"
             maxCount={1}
@@ -136,7 +163,7 @@ export default function CreateSkillModal({ onCancel, onOk }: CreateSkillModalPro
           >
             <div style={{ height: 206 }} className="dip-flex-column-center dip-gap-8">
               <CloudUploadOutlined className="dip-font-24" />
-              <p style={{ color: 'rgb(102, 102, 102)' }}>点击或拖拽上传 .zip 文件或 SKILL.md 文件。</p>
+              <p style={{ color: 'rgb(102, 102, 102)' }}>{intl.get('skill.uploadTip')}</p>
             </div>
           </Dragger>
         </Form.Item>

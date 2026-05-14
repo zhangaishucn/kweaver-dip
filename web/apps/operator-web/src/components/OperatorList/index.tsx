@@ -324,7 +324,11 @@ const OperatorList: React.FC<{ isPluginMarket?: boolean }> = ({ isPluginMarket =
         <div style={{ height: !isPluginMarket ? 'calc(100vh - 195px)' : 'calc(100vh - 145px)' }}>
           <OperatorCard
             loading={loading}
-            params={{ activeTab, isPluginMarket, enableSkillDetail: isPluginMarket }}
+            params={{
+              activeTab,
+              isPluginMarket,
+              enableSkillDetail: isPluginMarket || activeTab === OperatorTypeEnum.Skill,
+            }}
             fetchInfo={fetchInfo}
             hasMore={hasMore}
             operatorList={operatorList}

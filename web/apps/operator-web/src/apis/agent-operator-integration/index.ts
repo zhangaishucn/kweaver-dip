@@ -198,8 +198,16 @@ export function getSkillContent(skill_id: string) {
   return get(`${apis.skill}/${skill_id}/content`);
 }
 
+export function getSkillManagementContent(skill_id: string) {
+  return get(`${apis.skill}/${skill_id}/management/content`);
+}
+
 export function readSkillFile(skill_id: string, data: { rel_path: string }) {
   return post(`${apis.skill}/${skill_id}/files/read`, { body: data });
+}
+
+export function readSkillManagementFile(skill_id: string, data: { rel_path: string }) {
+  return post(`${apis.skill}/${skill_id}/management/files/read`, { body: data });
 }
 
 export function downloadSkill(skill_id: string) {
@@ -207,6 +215,24 @@ export function downloadSkill(skill_id: string) {
     responseType: 'blob',
     returnFullResponse: true,
   });
+}
+
+export function downloadSkillManagement(skill_id: string) {
+  return get(`${apis.skill}/${skill_id}/management/download`, {
+    responseType: 'blob',
+    returnFullResponse: true,
+  });
+}
+
+export function putSkillMetadata(
+  skill_id: string,
+  data: { name: string; description: string; category: string; source?: string; extend_info?: Record<string, any> }
+) {
+  return put(`${apis.skill}/${skill_id}/metadata`, { body: data });
+}
+
+export function putSkillPackage(skill_id: string, data: FormData | { file_type: 'zip' | 'content'; file: string }) {
+  return put(`${apis.skill}/${skill_id}/package`, { body: data });
 }
 
 export function postTool(box_id: string, data: any) {

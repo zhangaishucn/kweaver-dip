@@ -1,4 +1,5 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import intl from 'react-intl-universal';
 import { useSearchParams } from 'react-router-dom';
 import { Alert, Button, Empty, Layout, Modal, Skeleton, Tree, Typography, message } from 'antd';
 import { ArrowsAltOutlined, FileTextOutlined, FolderOpenOutlined } from '@ant-design/icons';
@@ -7,7 +8,14 @@ import remarkGfm from 'remark-gfm';
 import emptyImage from '@/assets/images/empty2.png';
 import '@/components/Operator/style.less';
 import styles from './SkillDetail.module.less';
-import { getSkillContent, getSkillInfo, getSkillMarketInfo, readSkillFile } from '@/apis/agent-operator-integration';
+import {
+  getSkillContent,
+  getSkillInfo,
+  getSkillManagementContent,
+  getSkillMarketInfo,
+  readSkillFile,
+  readSkillManagementFile,
+} from '@/apis/agent-operator-integration';
 import { postResourceOperation } from '@/apis/authorization';
 import DetailHeader from '@/components/OperatorList/DetailHeader';
 import { OperateTypeEnum, OperatorTypeEnum, PermConfigTypeEnum } from '@/components/OperatorList/types';
@@ -102,6 +110,7 @@ export default function SkillDetail() {
   const [contentLoading, setContentLoading] = useState(false);
   const [contentError, setContentError] = useState('');
   const [detailLoading, setDetailLoading] = useState(true);
+  const isMarketView = action === OperateTypeEnum.View;
 
   const selectedNode = useMemo(() => findSkillTreeNode(treeData, selectedKey), [treeData, selectedKey]);
   const previewType = useMemo(() => resolvePreviewType(selectedNode), [selectedNode]);
@@ -126,16 +135,17 @@ export default function SkillDetail() {
       return;
     }
 
-    if (!contentManifest?.url) return;
+    if (!contentManifest?.url && !contentManifest?.content) {
+      return;
+    }
 
     loadSelectedContent();
-  }, [selectedNode, selectedKey, contentManifest?.url, skillId]);
+  }, [selectedNode, selectedKey, contentManifest?.content, contentManifest?.url, skillId, action]);
 
   const fetchSkillInfo = async () => {
     setDetailLoading(true);
     try {
-      const response =
-        action === OperateTypeEnum.View ? await getSkillMarketInfo(skillId) : await getSkillInfo(skillId);
+      const response = isMarketView ? await getSkillMarketInfo(skillId) : await getSkillInfo(skillId);
       setSkillInfo(unwrapSkillResponse(response));
     } catch (error: any) {
       if (error?.description) {
@@ -148,7 +158,7 @@ export default function SkillDetail() {
 
   const fetchSkillContent = async () => {
     try {
-      const response = await getSkillContent(skillId);
+      const response = isMarketView ? await getSkillContent(skillId) : await getSkillManagementContent(skillId);
       const payload = unwrapSkillResponse<any>(response);
       const files = Array.isArray(payload?.files) ? (payload.files as SkillFileSummary[]) : [];
       setContentManifest(payload);
@@ -202,12 +212,20 @@ export default function SkillDetail() {
       if (targetNode.rel_path === 'SKILL.md') {
         url = contentManifest?.url;
       } else {
-        const fileResponse = await readSkillFile(skillId, { rel_path: targetNode.rel_path });
+        const fileResponse = isMarketView
+          ? await readSkillFile(skillId, { rel_path: targetNode.rel_path })
+          : await readSkillManagementFile(skillId, { rel_path: targetNode.rel_path });
         url = unwrapSkillResponse<any>(fileResponse)?.url;
       }
 
+      if (!url && targetNode.rel_path === 'SKILL.md' && contentManifest?.content) {
+        setPreviewUrl('');
+        setContentValue(contentManifest.content);
+        return;
+      }
+
       if (!url) {
-        throw new Error('文件地址不存在');
+        throw new Error(intl.get('skill.fileUrlMissing'));
       }
 
       if (previewType === 'markdown' || previewType === 'text') {
@@ -223,7 +241,7 @@ export default function SkillDetail() {
     } catch (error: any) {
       setContentValue('');
       setPreviewUrl('');
-      setContentError(error?.description || error?.message || '文件内容加载失败');
+      setContentError(error?.description || error?.message || intl.get('skill.fileLoadFailed'));
     } finally {
       setContentLoading(false);
     }
@@ -237,7 +255,7 @@ export default function SkillDetail() {
 
   const viewerContent =
     selectedNode?.nodeType === 'directory' ? (
-      renderPreviewEmpty('右侧为预览区，请选择文件进行预览')
+      renderPreviewEmpty(intl.get('skill.previewSelectFile'))
     ) : (
       <Skeleton active loading={detailLoading || contentLoading}>
         {contentError ? (
@@ -261,11 +279,11 @@ export default function SkillDetail() {
                 {previewUrl ? (
                   <img className={styles.mediaImage} src={previewUrl} alt={selectedNode?.title || 'preview'} />
                 ) : (
-                  <Empty description="图片加载中" />
+                  <Empty description={intl.get('skill.imageLoading')} />
                 )}
               </div>
             ) : null}
-            {previewType === 'unsupported' ? renderPreviewEmpty('当前文件暂不支持在线预览') : null}
+            {previewType === 'unsupported' ? renderPreviewEmpty(intl.get('skill.previewUnsupported')) : null}
           </>
         )}
       </Skeleton>
@@ -309,7 +327,7 @@ export default function SkillDetail() {
         <Sider width={360} className="operator-detail-sider">
           <div className="operator-detail-sider-content">
             <Text strong>
-              <FolderOpenOutlined /> 文件列表
+              <FolderOpenOutlined /> {intl.get('skill.fileList')}
             </Text>
           </div>
           <div className={styles.tree}>
@@ -337,7 +355,7 @@ export default function SkillDetail() {
             ) : (
               <Empty
                 image={<img src={emptyImage} alt="empty" style={{ width: 128 }} />}
-                description="暂无文件"
+                description={intl.get('skill.noFile')}
               />
             )}
           </div>
