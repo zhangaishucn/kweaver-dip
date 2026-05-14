@@ -37,3 +37,15 @@ COMMENT ON COLUMN t_digital_employee.app_id IS '数字员工绑定的应用账�
 COMMENT ON COLUMN t_digital_employee.kweaver_token IS '数字员工的 KWeaver Token';
 COMMENT ON COLUMN t_digital_employee.bkn_scope IS '数字员工的知识范围，逗号隔开的 id 列表';
 COMMENT ON COLUMN t_digital_employee.is_deleted IS '标记数字员工是否被删除';
+
+CREATE TABLE IF NOT EXISTS t_studio_account_token (
+    f_id VARCHAR(255) NOT NULL,
+    f_type VARCHAR(16) NOT NULL,
+    f_token TEXT NOT NULL,
+    CLUSTER PRIMARY KEY (f_id)
+);
+
+COMMENT ON TABLE t_studio_account_token IS '按主体（用户或应用）存储的 KWeaver/BKN 访问令牌';
+COMMENT ON COLUMN t_studio_account_token.f_id IS '主键；f_type=user 时为平台 userId；f_type=app 时为 appId（全表唯一）';
+COMMENT ON COLUMN t_studio_account_token.f_type IS 'app：应用账号；user：用户代理 PAT';
+COMMENT ON COLUMN t_studio_account_token.f_token IS '访问 BKN 的令牌串';
