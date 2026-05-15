@@ -1,0 +1,115 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "workflow.name" . }}
+  namespace: {{ .Values.namespace }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ include "workflow.name" . }}
+  replicas: {{ .Values.replicaCount }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "workflow.name" . }}
+    spec:
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - emptyDir: {}
+          name: tmp-logs
+      containers:
+        - name: flow-audit-config
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.registry }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/bin/bash", "-c"]
+          args:
+            - "cd ./workflow-rest && java -jar workflow-rest-0.0.1.jar"
+          volumeMounts:
+            - mountPath: /tmp
+              name: tmp-logs
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          envFrom:
+            - configMapRef:
+                name: workflow-config
+          ports:
+            - name: audit-cfg-pub
+              containerPort: {{ .Values.service.flowAuditCfgPort }}
+          startupProbe:
+            httpGet:
+              path: /api/workflow-rest/actuator/health/liveness
+              port: audit-cfg-pub
+            initialDelaySeconds: {{ .Values.service.startupProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.service.startupProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.service.startupProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.service.startupProbe.failureThreshold }}
+          readinessProbe:
+            httpGet:
+              path: /api/workflow-rest/actuator/health/readiness
+              port: audit-cfg-pub
+            initialDelaySeconds: {{ .Values.service.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.service.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.service.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.service.readinessProbe.failureThreshold }}
+          livenessProbe:
+            httpGet:
+              path: /api/workflow-rest/actuator/health/liveness
+              port: audit-cfg-pub
+            initialDelaySeconds: {{ .Values.service.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.service.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.service.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.service.livenessProbe.failureThreshold }}
+        - name: flow-audit-core
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.registry }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/bin/bash", "-c"]
+          args:
+            - "cd ./doc-audit-rest && java -jar doc-audit-rest-0.0.1.jar"
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          envFrom:
+            - configMapRef:
+                name: workflow-config
+          ports:
+            - name: audit-core-pub
+              containerPort: {{ .Values.service.flowAuditCorePort }}
+          volumeMounts:
+            - mountPath: /tmp
+              name: tmp-logs
+          startupProbe:
+            httpGet:
+              path: /api/doc-audit-rest/actuator/health/liveness
+              port: audit-core-pub
+            initialDelaySeconds: {{ .Values.service.startupProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.service.startupProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.service.startupProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.service.startupProbe.failureThreshold }}
+          readinessProbe:
+            httpGet:
+              path: /api/doc-audit-rest/actuator/health/readiness
+              port: audit-core-pub
+            initialDelaySeconds: {{ .Values.service.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.service.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.service.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.service.readinessProbe.failureThreshold }}
+          livenessProbe:
+            httpGet:
+              path: /api/doc-audit-rest/actuator/health/liveness
+              port: audit-core-pub
+            initialDelaySeconds: {{ .Values.service.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.service.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.service.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.service.livenessProbe.failureThreshold }}
+        

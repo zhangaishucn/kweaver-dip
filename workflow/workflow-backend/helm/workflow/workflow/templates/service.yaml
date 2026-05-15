@@ -1,0 +1,73 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: flow-audit-config
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: {{ include "workflow.name" . }}
+    name: {{ include "workflow.flowAuditConfigName" . }}
+spec:
+{{- if .Values.service.enableDualStack }}
+  ipFamilies:
+  - IPv6
+  - IPv4
+  ipFamilyPolicy: PreferDualStack
+{{- end }}
+  ports:
+    - name: audit-cfg-pub
+      targetPort: audit-cfg-pub
+      port: {{ .Values.service.flowAuditCfgPort }}
+      protocol: TCP
+  selector:
+    app: {{ include "workflow.name" . }}
+  type: {{ .Values.service.type }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: flow-audit-config-private
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: {{ include "workflow.name" . }}
+    name: {{ include "workflow.flowAuditConfigName" . }}
+spec:
+{{- if .Values.service.enableDualStack }}
+  ipFamilies:
+  - IPv6
+  - IPv4
+  ipFamilyPolicy: PreferDualStack
+{{- end }}
+  ports:
+    - name: audit-cfg-priv
+      targetPort: audit-cfg-priv
+      port: {{ .Values.service.flowAuditCfgPrivatePort }}
+      protocol: TCP
+  selector:
+    app: {{ include "workflow.name" . }}
+  type: {{ .Values.service.type }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: flow-audit-core
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: {{ include "workflow.name" . }}
+    name: {{ include "workflow.flowAuditCoreName" . }}
+spec:
+{{- if .Values.service.enableDualStack }}
+  ipFamilies:
+  - IPv6
+  - IPv4
+  ipFamilyPolicy: PreferDualStack
+{{- end }}
+  ports:
+    - name: audit-core-pub
+      targetPort: audit-core-pub
+      port: {{ .Values.service.flowAuditCorePort }}
+      protocol: TCP           
+  selector:
+    app: {{ include "workflow.name" . }}
+  type: {{ .Values.service.type }}
