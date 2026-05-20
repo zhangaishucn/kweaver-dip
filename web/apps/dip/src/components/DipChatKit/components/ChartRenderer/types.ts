@@ -58,4 +58,5 @@ export interface ChartRendererProps {
   variant?: 'inline' | 'preview'
   initialDisplayMode?: DipChatKitChartDisplayMode
   isInModal?: boolean
+  hideActions?: boolean
 }

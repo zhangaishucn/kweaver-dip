@@ -11,4 +11,5 @@ export interface MarkdownRendererProps {
   variant?: MarkdownRendererVariant
   components?: MarkdownRendererComponents
   allowLenientChartParse?: boolean
+  hideChartActions?: boolean
 }

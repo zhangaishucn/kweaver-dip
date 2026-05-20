@@ -14,6 +14,5 @@ export interface ChartViewSwitcherProps {
   className?: string
   isInModal?: boolean
   onSelectChartMode: (mode: Exclude<DipChatKitChartDisplayMode, 'table'>) => void
-  onShowChart: () => void
   onShowTable: () => void
 }

@@ -1,5 +1,5 @@
 ﻿import { ExpandOutlined } from '@ant-design/icons'
-import { Button, Tooltip, Modal } from 'antd'
+import { Button, Modal, Tooltip } from 'antd'
 import clsx from 'clsx'
 import { BarChart, LineChart, PieChart, ScatterChart } from 'echarts/charts'
 import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
@@ -81,6 +81,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
   variant = 'inline',
   initialDisplayMode,
   isInModal = false,
+  hideActions = false,
 }) => {
   const chartRef = useRef<HTMLDivElement | null>(null)
   const chartInstanceRef = useRef<echarts.EChartsType | null>(null)
@@ -158,7 +159,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
   }, [chart.chartType, chart.plotId, resolvedChartDisplayMode, resolvedInitialDisplayMode])
 
   useEffect(() => {
-    if (!shouldRenderChartCanvas || !chartRef.current) return
+    if (!(shouldRenderChartCanvas && chartRef.current)) return
 
     const chartInstance = echarts.init(chartRef.current)
     chartInstanceRef.current = chartInstance
@@ -177,7 +178,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
   }, [shouldRenderChartCanvas])
 
   useEffect(() => {
-    if (!shouldRenderChartCanvas || !chartViewResult) return
+    if (!(shouldRenderChartCanvas && chartViewResult)) return
 
     chartInstanceRef.current?.setOption(chartViewResult.option, true)
     chartInstanceRef.current?.resize()
@@ -198,44 +199,43 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
                 <div className={styles.title}>{title}</div>
               </div>
             )}
-            <div className={styles.headerActions}>
-              {canSwitchView && (
-                <div className={styles.switcherShell}>
-                  <ChartViewSwitcher
-                    isInModal={isInModal}
-                    className={styles.switcher}
-                    activeDisplayMode={activeDisplayMode}
-                    lastChartDisplayMode={switcherSelectedDisplayMode}
-                    items={switcherItems}
-                    onSelectChartMode={(mode) => {
-                      setLastChartDisplayMode(mode)
-                      setActiveDisplayMode(mode)
-                    }}
-                    onShowChart={() => {
-                      setActiveDisplayMode(backendDisplayMode)
-                    }}
-                    onShowTable={() => {
-                      setActiveDisplayMode('table')
-                    }}
-                  />
-                </div>
-              )}
-              {variant === 'inline' && (
-                <div className={styles.previewShell}>
-                  <div className={styles.previewActions}>
-                    <Tooltip title={previewTitle}>
-                      <Button
-                        type='text'
-                        icon={<ExpandOutlined />}
-                        onClick={() => {
-                          setModalOpen(true)
-                        }}
-                      />
-                    </Tooltip>
+            {!hideActions && (
+              <div className={styles.headerActions}>
+                {canSwitchView && (
+                  <div className={styles.switcherShell}>
+                    <ChartViewSwitcher
+                      isInModal={isInModal}
+                      className={styles.switcher}
+                      activeDisplayMode={activeDisplayMode}
+                      lastChartDisplayMode={switcherSelectedDisplayMode}
+                      items={switcherItems}
+                      onSelectChartMode={(mode) => {
+                        setLastChartDisplayMode(mode)
+                        setActiveDisplayMode(mode)
+                      }}
+                      onShowTable={() => {
+                        setActiveDisplayMode('table')
+                      }}
+                    />
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+                {variant === 'inline' && (
+                  <div className={styles.previewShell}>
+                    <div className={styles.previewActions}>
+                      <Tooltip title={previewTitle}>
+                        <Button
+                          type="text"
+                          icon={<ExpandOutlined />}
+                          onClick={() => {
+                            setModalOpen(true)
+                          }}
+                        />
+                      </Tooltip>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <div className={clsx(styles.content, isInModal && styles.modalContent)}>
             {isTableDisplayMode && switchableDataset ? (
@@ -276,7 +276,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           <div className={styles.drawerContent}>
             <ChartRenderer
               chart={chart}
-              variant='preview'
+              variant="preview"
               initialDisplayMode={activeDisplayMode}
               className={styles.drawerChart}
               isInModal

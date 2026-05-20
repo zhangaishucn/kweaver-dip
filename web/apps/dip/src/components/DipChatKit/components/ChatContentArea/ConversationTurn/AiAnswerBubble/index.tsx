@@ -488,7 +488,7 @@ const AiAnswerBubble: React.FC<AiAnswerBubbleProps> = ({
         requireRenderable: true,
       })
       if (chartPayload) {
-        return <ChartRenderer chart={chartPayload} />
+        return <ChartRenderer chart={chartPayload} hideActions={turn.answerStreaming} />
       }
 
       const artifactPreviewPayload = buildArchiveGridPreviewPayload(turn.sessionKey, codeText)
@@ -722,6 +722,7 @@ const AiAnswerBubble: React.FC<AiAnswerBubbleProps> = ({
                   components={toolCardMarkdownComponents}
                   content={toolCard.text}
                   allowLenientChartParse={!turn.answerStreaming}
+                  hideChartActions={turn.answerStreaming}
                 />
               ) : (
                 <pre className={styles.chatToolCardPreviewText}>{toolCard.previewText}</pre>
@@ -737,6 +738,7 @@ const AiAnswerBubble: React.FC<AiAnswerBubbleProps> = ({
                   components={toolCardMarkdownComponents}
                   content={toolCard.text}
                   allowLenientChartParse={!turn.answerStreaming}
+                  hideChartActions={turn.answerStreaming}
                 />
               ) : (
                 <span className={styles.chatToolCardInlineText}>{toolCard.inlineText}</span>
@@ -911,6 +913,7 @@ const AiAnswerBubble: React.FC<AiAnswerBubbleProps> = ({
               components={markdownComponents}
               content={thinkingText}
               allowLenientChartParse={!turn.answerStreaming}
+              hideChartActions={turn.answerStreaming}
             />
           </Think>
         )}
@@ -921,6 +924,7 @@ const AiAnswerBubble: React.FC<AiAnswerBubbleProps> = ({
             components={markdownComponents}
             content={answerText}
             allowLenientChartParse={!turn.answerStreaming}
+            hideChartActions={turn.answerStreaming}
           />
         )}
       </div>

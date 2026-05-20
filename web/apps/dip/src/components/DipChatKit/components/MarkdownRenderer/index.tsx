@@ -32,6 +32,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   variant = 'answer',
   components,
   allowLenientChartParse = true,
+  hideChartActions = false,
 }) => {
   const markdownComponents = useMemo(() => {
     const CodeRenderer: React.FC<MarkdownComponentProps> = ({
@@ -56,7 +57,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
         requireRenderable: true,
       })
       if (chartPayload) {
-        return <ChartRenderer chart={chartPayload} />
+        return <ChartRenderer chart={chartPayload} hideActions={hideChartActions} />
       }
 
       return <CodeHighlighter lang={language}>{codeText}</CodeHighlighter>
@@ -67,7 +68,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
       [CHANNEL_MENTION_TAG]: ChannelMentionRenderer,
       ...(components || {}),
     }
-  }, [allowLenientChartParse, components])
+  }, [allowLenientChartParse, components, hideChartActions])
 
   return (
     <div className={clsx('MarkdownRenderer', styles.root, styles[variant], className)}>

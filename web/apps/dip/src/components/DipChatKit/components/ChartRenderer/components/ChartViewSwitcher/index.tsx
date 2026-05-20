@@ -4,8 +4,8 @@
   DownOutlined,
   PieChartOutlined,
 } from '@ant-design/icons'
-import { Button, Dropdown, Radio, Tooltip } from 'antd'
 import type { MenuProps, RadioChangeEvent } from 'antd'
+import { Button, Dropdown, Radio, Tooltip } from 'antd'
 import clsx from 'clsx'
 import type React from 'react'
 import { useMemo } from 'react'
@@ -17,7 +17,7 @@ import type { ChartViewSwitcherItem, ChartViewSwitcherProps } from './types'
 
 const getBuiltInIcon = (mode: DipChatKitChartDisplayMode): React.ReactNode => {
   if (mode === 'table') {
-    return <IconFont type='icon-table' />
+    return <IconFont type="icon-table" />
   }
 
   if (mode === 'column') {
@@ -25,7 +25,7 @@ const getBuiltInIcon = (mode: DipChatKitChartDisplayMode): React.ReactNode => {
   }
 
   if (mode === 'line') {
-    return <IconFont type='icon-echats' />
+    return <IconFont type="icon-echats" />
   }
 
   if (mode === 'donut') {
@@ -67,7 +67,6 @@ const ChartViewSwitcher: React.FC<ChartViewSwitcherProps> = ({
   className,
   isInModal,
   onSelectChartMode,
-  onShowChart,
   onShowTable,
 }) => {
   const activeChartItem = useMemo(() => {
@@ -127,7 +126,7 @@ const ChartViewSwitcher: React.FC<ChartViewSwitcherProps> = ({
         <Radio.Group
           block
           options={radioOptions}
-          optionType='button'
+          optionType="button"
           value={activeDisplayMode}
           onChange={handleRadioChange}
         />
@@ -135,7 +134,7 @@ const ChartViewSwitcher: React.FC<ChartViewSwitcherProps> = ({
         <>
           <Tooltip title={switchToTableTitle}>
             <Button
-              size='small'
+              size="small"
               type={activeDisplayMode === 'table' ? 'primary' : 'default'}
               icon={getBuiltInIcon('table')}
               onClick={onShowTable}
@@ -153,12 +152,12 @@ const ChartViewSwitcher: React.FC<ChartViewSwitcherProps> = ({
                   onSelectChartMode(key as Exclude<DipChatKitChartDisplayMode, 'table'>)
                 },
               }}
-            placement='bottomRight'
+              placement="bottomRight"
             >
               <span>
                 <Tooltip title={switchChartTypeTitle}>
                   <Button
-                    size='small'
+                    size="small"
                     type={activeDisplayMode === 'table' ? 'default' : 'primary'}
                     icon={activeChartItem.icon}
                   >
