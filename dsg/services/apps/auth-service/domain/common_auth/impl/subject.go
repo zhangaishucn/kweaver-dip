@@ -13,7 +13,6 @@ import (
 	"github.com/kweaver-ai/idrm-go-common/rest/indicator_management"
 	"github.com/kweaver-ai/idrm-go-common/rest/user_management"
 	"github.com/kweaver-ai/idrm-go-frame/core/telemetry/log"
-	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/adapter/driven/gorm"
 	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/dto"
 	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/enum"
 	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/errorcode"
@@ -25,7 +24,6 @@ import (
 
 type AuthHelper struct {
 	redisClient          *redis.Client
-	subIndicatorRepo     gorm.IndicatorDimensionalRuleInterface
 	ccDriven             configuration_center.Driven
 	apiDriven            data_application_service.Driven
 	dataViewDriven       data_view.Driven
@@ -35,7 +33,6 @@ type AuthHelper struct {
 
 func NewAuthHelper(
 	redisClient *redis.Client,
-	subIndicatorRepo gorm.IndicatorDimensionalRuleInterface,
 	ccDriven configuration_center.Driven,
 	apiDriven data_application_service.Driven,
 	dataViewDriven data_view.Driven,
@@ -44,7 +41,6 @@ func NewAuthHelper(
 ) *AuthHelper {
 	return &AuthHelper{
 		redisClient:          redisClient,
-		subIndicatorRepo:     subIndicatorRepo,
 		ccDriven:             ccDriven,
 		apiDriven:            apiDriven,
 		dataViewDriven:       dataViewDriven,

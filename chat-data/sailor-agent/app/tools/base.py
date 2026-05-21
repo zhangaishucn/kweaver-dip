@@ -253,6 +253,7 @@ class ToolName(Enum):
     from_json2plot = "json2plot"
     from_text2sql = "text2sql"
     from_text2metric = "text2metric"
+    from_smart_forecasting = "smart_forecasting"
     from_get_tool_cache = "get_tool_cache"
     from_sql_helper = "sql_helper"
 
@@ -261,9 +262,6 @@ class ToolName(Enum):
     detect_anomalies = "detect_anomalies"
     decision_maker = "decision_maker"
     from_get_metadata = "get_metadata"
-
-    # sandbox tools
-    sandbox = "sandbox"
 
 
 @dataclass

@@ -26,6 +26,7 @@ from app.tools.base import (
     async_construct_final_answer
 )
 from config import get_settings
+from app.utils.llm_config import build_data_understand_llm_dict
 from app.logs.logger import logger
 from .prompts.business_object_identification import BusinessObjectIdentificationPrompt
 
@@ -354,20 +355,7 @@ class BusinessObjectIdentificationTool(LLMTool):
         params: dict
     ):
         """将工具转换为异步 API 类方法"""
-        llm_dict = {
-            "model_name": settings.TOOL_LLM_MODEL_NAME,
-            "openai_api_key": settings.TOOL_LLM_OPENAI_API_KEY,
-            "openai_api_base": settings.TOOL_LLM_OPENAI_API_BASE,
-        }
-
-        # llm_dict.update(params.get("llm", {}))
-        llm_out_dict = params.get("llm", {})
-        if llm_out_dict.get("name"):
-            llm_dict["model_name"] = llm_out_dict.get("name")
-        if llm_out_dict.get("max_tokens"):
-            llm_dict["max_tokens"] = llm_out_dict.get("max_tokens")
-        else:
-            llm_dict["max_tokens"] = 20000
+        llm_dict = build_data_understand_llm_dict(params)
         llm = CustomChatOpenAI(**llm_dict)
 
         auth_dict = params.get("auth", {})
@@ -720,13 +708,7 @@ class BusinessObjectIdentificationTool(LLMTool):
         params: dict
     ):
         """将工具转换为异步 API 类方法，直接接受视图数据（新格式）"""
-        llm_dict = {
-            "model_name": settings.TOOL_LLM_MODEL_NAME,
-            "openai_api_key": settings.TOOL_LLM_OPENAI_API_KEY,
-            "openai_api_base": settings.TOOL_LLM_OPENAI_API_BASE,
-            "max_tokens": 20000
-        }
-        llm_dict.update(params.get("llm", {}))
+        llm_dict = build_data_understand_llm_dict(params)
         llm = CustomChatOpenAI(**llm_dict)
 
         auth_dict = params.get("auth", {})
@@ -744,6 +726,7 @@ class BusinessObjectIdentificationTool(LLMTool):
             data_source_num_limit=config_dict.get("data_source_num_limit", -1),
             dimension_num_limit=config_dict.get("dimension_num_limit", -1),
             with_sample=config_dict.get("with_sample", False),
+            model_type=llm_dict["model_name"],
         )
 
         query = params.get("query", "")

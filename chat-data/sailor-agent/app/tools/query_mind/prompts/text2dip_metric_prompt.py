@@ -56,17 +56,31 @@ dip_metric_prompt_template = """# ROLE
     "reason": "... 选择指标和参数的原因 ... "
 }
 
+{% if fixed_metric_id %}
+原因中需说明：**用户已指定指标** `{{ fixed_metric_id }}`，并说明时间范围、时间间隔（step）、分析维度与过滤条件的设置依据。
+{% else %}
 原因中需要包含,为什么选择该指标,为什么选择该时间范围,选择什么样的时间间隔,以及为什么设置分析维度和过滤条件
+{% endif %}
 
 ### 任务1: 选择指标
 
+{% if fixed_metric_id %}
+用户**已指定**待查询指标，**禁止**更换为下方列表中的其他指标。
+
+- 输出 JSON 中的 `metric_id` **必须**为: `{{ fixed_metric_id }}`
+- 你的核心任务是根据用户问题与该指标的元数据/维度信息（见上文「可用指标的基本信息」），正确生成 **query_params**（时间、过滤、分析维度、同环比等），并生成 title、reason、explanation。
+{% else %}
 根据用户的问题选择一个合适的指标，指标的 id 为指标的唯一标识
 
 **注意**:
 1. 一次只能选择一个指标
 2. 指标名称只用于选择指标，不要用于改写问题和辅助理解问题
 
+{% endif %}
+
 ### 任务2: 生成指标查询参数 query_params
+
+**时间字段（硬性）**：`query_params` 中凡出现 **`start`**、**`end`** 或表示时刻的 **`time`**，其值**必须**为 **Unix 毫秒时间戳整型**（与 `1778743620000`、`1767196800000` 相同形态：**JSON number**、无引号、一般为 13 位）。**禁止**使用 `"YYYY-MM-DD HH:MM:SS"` 等日期时间字符串。可先在推理中换算人类时间，再写入毫秒整型。
 
 #### 任务2.1: 设置时间约束
 
@@ -76,8 +90,8 @@ dip_metric_prompt_template = """# ROLE
 例如, 查询最近1小时的数据:
 "query_params": {
     "instant": false,   # 如果要按时间段分析（按时间下钻），则设置为 false，否则设置为 true
-    "start": "2025-01-01 00:00:00",  # 开始时间
-    "end": "2025-01-01 23:59:59",    # 结束时间
+    "start": 1735660800000,
+    "end": 1735747199000,
     "step": "hour",            # 时间下钻, 参考下面的说明, promsql 使用数值+单位类似 `1d`, sql 使用日历类型. 类似 `hour`
 }
 
@@ -122,6 +136,42 @@ dip_metric_prompt_template = """# ROLE
 - `year`: 1年
 {% endif %}
 
+{% if query_type == "sql" %}
+##### 2.1.5: 自然年「今年 / 去年 / 某年 + 总量、合计、一共多少」且未要求更细时间粒度时（BKN 原生指标 / 日历 step 场景）
+
+当用户只要**某一自然年内的总量**（如「查询今年的订单总量」「2025 年全年销量一共多少」），且问题中**没有**明确要求「按月 / 按季度 / 按天 / 每天 / 各月」等更细时间下钻时：
+
+1. **不要**仅用 `instant: true` 搭配全年 `start`/`end` 来代表「全年合计」。在 **sql 日历聚合（含 BKN 原生指标）** 下，这种方式可能与按年分桶结果不一致，甚至出现 **合计为 0**。
+2. **必须**使用：**`instant: false`**、**`step: "year"`**、**`analysis_dimensions: []`**（用户未要求按产品/区域等业务维度拆分时保持空数组），必要时 `filters` 仍按问题设置。
+3. **`start` / `end`**：取该自然年 **1 月 1 日 00:00:00** 至 **12 月 31 日 23:59:59**（闭区间）在**当地时区**下的 **Unix 毫秒整型**。相对「今年」「去年」等须依据 **`{{ current_date_time }}`** 推算年份。
+4. **时间写法**：`start`、`end` **只能**输出为 **Unix 毫秒整型**（禁止日期时间字符串）。
+
+**结构示例（毫秒须按用户所指年份与时区自行换算，勿照搬）：**
+
+```json
+"query_params": {
+    "instant": false,
+    "start": 1767196800000,
+    "end": 1798732799000,
+    "step": "year",
+    "analysis_dimensions": []
+}
+```
+
+##### 2.1.6: 跨多年、长区间、近多月等「总数 / 合计 / 聚合」与边界收紧（BKN / sql 与 ontology-query 语义对齐）
+
+当用户要查**多年累计、指定起止日期内的总量、或其它宽时间窗上的聚合**（例如「2020 年 5 月到 2028 年 5 月订单一共多少」「近若干年的总和」），且当前指标为 **sql**（含 BKN 原生指标）时：
+
+**同类场景（与上条规则完全相同，勿改用 §2.1.3 的「仅 `instant: true` + `start`/`end`、无 `step`」）：** 用户只要**一段时间内的总量 / 订单量 / 合计**，且时间窗为**相对或绝对的宽窗**（如「**近三个月 / 最近 N 个月 / 近三十天**订单**一共多少**」「**本季度**销量**总量**」），且问题中**没有**明确要求「**按月 / 按周 / 按天 / 各月 / 每天**」等**更细时间下钻**时，**一律按本节**处理，与「多年 / 长区间求总数」使用**同一套 `query_params` 策略**（**`instant: false`**、与窗口长度匹配的 **`step`**、**`analysis_dimensions: []`**，以及下文 **`filters` / `limit`** 约定）。
+
+1. **输出形态仍是 `query_params`（DIP 风格）**，不要直接输出 ontology-query 原始 JSON（例如不要自行编造顶层 `condition` / `sub_conditions` 对象交给用户）；由服务将合法字段翻译为底层请求：其中 **`filters`** 会映射为 **`condition: {"operation": "and", "sub_conditions": [...]}`**。
+2. **时间主轴**：必须包含 **`instant`、`start`、`end`**，并与用户意图一致；`start` / `end` **必须为 Unix 毫秒整型**（规则同 §2.1 总述）。宽区间若只关心**合计**而非逐段走势，优先选用与区间长度匹配的较粗 **`step`**：以**年**为主时用 **`year`**；以**若干自然月**为主（如近三个月）时用 **`month`**；以**季度**为主时用 **`quarter`**；更短窗可酌情用 **`week`** / **`day`** 等；并配合 **`instant: false`**、**`analysis_dimensions: []`**，避免误用 `instant: true` 与日历分桶不一致导致合计偏差或 0（原则同 §2.1.5）。
+3. **与 `date_field` 对齐的额外时间边界**：若用户给出了**明确的上下界时刻**（含 `YYYY/MM/DD HH:mm:ss` 等），除 `start`/`end` 外，可在 **`filters`** 中对指标的 **`date_field`**（元数据中的时间字段名，如 `order_date`）使用 **`name` 为该字段名**、`operation` 为 **`>=` / `<=`**、`value` 为问题中的时间字面量（或与之一致的规范写法）。
+4. **序列条数上限**：若用户明确要求「最多 N 条 / 前 N 个时间桶 / 限制返回点数」，在 **`query_params` 中增加整数 `limit: N`**；用户未提及时不要随意添加 `limit`。
+
+**语义参照（理解即可，生成时仍用 `query_params` 键名）：** 底层查数等价于在 **`time` + `time_dimension.property`** 上查询，并可带 **`condition.sub_conditions`** 与可选的 **`limit`**；项目内fixture **`scripts/fixtures/metric_query_statistics_order_num_subcond.json`** 展示了与上述 filters / limit 对应的请求体结构示意。
+{% endif %}
+
 **注意**:
 1. 聚合方式必须严格遵守格式，请理解用户问题，选择合适的聚合方式
 2. 指标具备聚合分析能力, 如果用户没有特别说明，不要设置更小粒度的聚合方式
@@ -151,8 +201,8 @@ look_back_delta 默认是5min。格式是 look_back_delta=<time_durations>，tim
 下面是一个例子:
 "query_params": {
     "instant": true,   # 如果要按时间进行汇总，不需要任何时间段分析，则设置为 true，否则设置为 false
-    "time": "2025-01-01 23:59:59", // 开始追溯的时间
-    "look_back_delta": "1y" // 追溯的时间长度
+    "time": 1735747199000,
+    "look_back_delta": "1y" // 追溯的时间长度；time 为 Unix 毫秒整型
 }
 
 **注意**: 设置了 instant 为 true 后，就不支持按时间段分段(按时间下钻)分析了
@@ -160,22 +210,23 @@ look_back_delta 默认是5min。格式是 look_back_delta=<time_durations>，tim
 ##### 2.1.3: 设置绝对时间段
 
 如果用户想查某一时间段内的数据, 不需要设置分段分析或者下钻分析, 而是计算汇总值, 例如:
-1. 2月15日至2月20日的PM2.5平均值, 则: instnat 为 true, 时间分析粒度, start = 2025-02-15 00:00:00, end = 2025-02-20 23:59:59
-2. 1月2日至1月10日的不同大区的销量, 则: instnat 为 true, 时间分析粒度, start = 2025-01-02 00:00:00, end = 2025-01-10 23:59:59
+（**例外**：`query_type` 为 `sql` 时：**某一自然年全年总量**且未要求更细时间粒度 → **§2.1.5**（`instant: false` + `step: "year"`）；**多年 / 长区间 / 近 N 月等宽窗合计**且未要求按更细粒度逐段展示 → **§2.1.6**（`instant: false` + 与窗口匹配的 **`step`** 等）。上述情形**勿**按本节使用仅 **`instant: true` + `start`/`end`、无 `step`** 来代表宽窗合计。）
+1. 2月15日至2月20日的PM2.5平均值, 则: instnat 为 true, 时间分析粒度, start / end 为该区间起止的 **Unix 毫秒整型**
+2. 1月2日至1月10日的不同大区的销量, 则: instnat 为 true, 时间分析粒度, start / end 为该区间起止的 **Unix 毫秒整型**
 
 这时候不需要设置 step, time 和 look_back_delta, 直接设置 start 和 end 即可
 
 具体例子如下:
 "query_params": {
     "instant": true,
-    "start": "2025-02-15 00:00:00",
-    "end": "2025-02-20 23:59:59"
+    "start": 1739548800000,
+    "end": 1740067199000
 }
 
 ##### 2.1.4: 使用相对时间
 
 当用户问题中没有提到日期，默认是当年, 当月, 或者当天
-如果问题中包含相对时间时，需要根据当前时间 {{ current_date_time }} 计算时间约束，由于要精确设置时间戳, 下面是 instant 为 true 或 false 的一些示例:
+如果问题中包含相对时间时，需要根据当前时间 {{ current_date_time }} 计算时间约束，**写入 JSON 时** `start` / `end` / `time` 均须为 **Unix 毫秒整型**；下面是语义上的时刻说明（输出前须换算为毫秒）:
 - 最近1小时:
   - instant = true, time = 当前时间 - 1小时, look_back_delta = 1h
   - instant = true, start = 当前时间 - 1小时, end = 当前时间
@@ -261,12 +312,12 @@ time_granularity 可选值:
 {
     "metric_id": "product_output_metric",
     "reason": "我们需要查询2021年1季度产品产量同比增长率, 这是一个按时间段分析的场景, 需要设置开始时间是2021年1月1日, 结束时间是2021年3月31日, 时间聚合方式为季度, 需要计算年度同比增长率",
-    "explanation": "使用 '产品产量' 指标，查询2021年1季度A产品在北区的产量同比增长率, 开始时间是2021年1月1日, 结束时间是2021年3月31日, 时间聚合方式为季度, 需要计算年度同比增长率"
+    "explanation": "使用 '产品产量' 指标，查询2021年1季度A产品在北区的产量同比增长率, 开始时间是2021年1月1日, 结束时间是2021年3月31日, 时间聚合方式为季度, 需要计算年度同比增长率",
     "title": "2021年1季度A产品在北区的产量同比增长率",
     "query_params": {
         "instant": false,
-        "start": "2021-01-01 00:00:00",
-        "end": "2021-03-31 23:59:59",
+        "start": 1609430400000,
+        "end": 1617206399000,
         "step": "quarter",
         "analysis_dimensions": ["product"],
         "filters": [
@@ -301,8 +352,8 @@ time_granularity 可选值:
     "title": "2021年1月3日~5日的总产量",
     "query_params": {
         "instant": true,
-        "start": "2021-01-03 00:00:00",
-        "end": "2021-01-05 23:59:59",
+        "start": 1609603200000,
+        "end": 1609862399000
     }
 }
 
@@ -317,10 +368,10 @@ time_granularity 可选值:
 
 请返回一个JSON对象, 请不要使用上面的例子, 包含以下Key:
 
-1. metric_id: 选择的指标id, 注意一次只能选择一个指标，不选则设置为空字符串
-2. query_params: 指标查询参数
+1. metric_id: {% if fixed_metric_id %}必须为 `{{ fixed_metric_id }}`（用户已指定），不得为空或改为其他值{% else %}选择的指标id, 注意一次只能选择一个指标，不选则设置为空字符串{% endif %}
+2. query_params: 指标查询参数（执行指标查询的请求体核心字段，须符合该指标的 query_type：sql / promsql 等的时间与 step 约定；**`start` / `end`（及 `time`）须为 Unix 毫秒整型**；**sql 宽区间 / 多年 / 近多月等合计见 §2.1.6**；用户要求限制返回点数时可含 **`limit`** 正整数）
 3. explanation: 对选择的指标和参数的解释。解释应包含选择的指标、时间范围、过滤条件、同环比分析等
-4. reason: 生成参数的解释，解释为什么选择这个指标，为什么选择这个时间范围，为什么选择这个过滤条件，按什么维度进行聚合，是否需要计算同环比
+4. reason: 生成参数的解释；{% if fixed_metric_id %}说明在指定指标下时间范围、过滤与维度的依据{% else %}解释为什么选择这个指标，为什么选择这个时间范围，为什么选择这个过滤条件，按什么维度进行聚合，是否需要计算同环比{% endif %}
 5. title: 生成数据的标题
 
 示例输出：
@@ -328,7 +379,7 @@ time_granularity 可选值:
     "metric_id": "...",
     "reason": "...",
     "explanation": "...",
-    "title": "..."
+    "title": "...",
     "query_params": ...,
 }
 
@@ -342,13 +393,17 @@ time_granularity 可选值:
 
 ## 特别注意事项
 
+{% if not fixed_metric_id %}
 1. 检查选择指标的正确性，如果找不到合适的指标, metric_id 请填写空字符串，并在 explanation 中说明"有哪些指标可用"
-2. **请再次检查**, query_params 中的 instant/time/start/end/look_back_delta 格式正确
+{% else %}
+1. **metric_id 已锁定**为 `{{ fixed_metric_id }}`，仅校验 query_params 与业务意图是否一致
+{% endif %}
+2. **请再次检查**, query_params 中的 instant/time/start/end/look_back_delta 格式正确；**`start` / `end` / `time` 为毫秒整型，非日期字符串**
 3. **请再次检查**, query_params 中的 filters 格式正确
 4. **请再次检查**, query_params 中的 analysis_dimensions 是否正确
 5. **请再次检查**, 时间范围是否正确，千万要注意当前时间 {{ current_date_time }}, 注意月份的日期, 注意闰年的2月份是29天等情况
 6. **请再次检查**, 同环比分析的时间范围是否正确，只需要设置最近的一个统计周期，而不是全部时间范围
-6. **请再次检查**, 不要增加上述没有提到的参数，不要设置指标信息中不存在的字段
+7. **请再次检查**, 不要增加上述没有提到的参数，不要设置指标信息中不存在的字段；**例外**：用户明确要求限制返回点数时，可在 `query_params` 中设置 **`limit`**（正整数），参见 §2.1.6
 
 必须按 `Output Instructions` 定义的 JSON 格式输出!
 注意先输出结构中的 reason 参数，再输出其他参数
@@ -373,10 +428,12 @@ class Text2DIPMetricPrompt(BasePrompt):
     - metrics: list, the metrics that need to be analyzed
     - samples: list, the sample data
     - background: str, the background information
+    - fixed_metric_id: 用户已指定指标时锁定 metric_id，模型只生成 query_params
     """
     metrics: Any = ""
     samples: dict = {}
     background: str = ""
+    fixed_metric_id: str = ""
     templates: dict = prompts
     language: str = "cn"
     current_date_time: str = ""

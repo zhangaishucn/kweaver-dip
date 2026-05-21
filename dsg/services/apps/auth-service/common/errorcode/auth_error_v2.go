@@ -18,13 +18,9 @@ var (
 )
 
 var (
-	PublicDatabaseErr              = publicModule.Description("DatabaseError", "数据库异常")
 	PublicQueryUserInfoError       = publicModule.Description("QueryUserInfoError", "查询用户信息错误")
-	PublicInternalErr              = publicModule.Description("InternalError", "内部错误")
 	PublicDataAuditingErr          = publicModule.Description("DataAuditingErr", "审核中，无法修改")
 	PublicResourceNotExistErr      = publicModule.Description("ResourceNotExistErr", "资源不存在")
-	PublicInvalidParameterErr      = publicModule.Solution("InvalidParameter", "参数值校验不通过", "", ReadManualSolution)
-	PublicInvalidParameterJsonErr  = publicModule.Solution("InvalidParameterJson", "参数值校验不通过：json格式错误", "", ReadManualSolution)
 	PublicConfigurationCenterError = publicModule.Description("QueryConfigurationCenterError", "配置中心查询错误")
 )
 
@@ -54,4 +50,9 @@ var (
 	UserNotExistErr      = UserModule.Description("UserNotExistError", "用户不存在")
 	GetUserInfoFailedErr = UserModule.Description("GetUserInfoFailedErr", "获取用户信息失败")
 	SendAuditApplyMsgErr = UserModule.Description("SendAuditApplyMsgError", "发送审核信息错误")
+)
+
+var (
+	UnsupportedResourceTypeErr        = DataAuthModule.Description("UnsupportedResourceTypeErr", "不支持的资源类型")
+	AuditContentGenerationFailedErr   = DataAuthModule.Description("AuditContentGenerationFailedErr", "审核内容生成失败")
 )

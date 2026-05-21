@@ -3,6 +3,7 @@ package resources
 import (
 	"context"
 	"fmt"
+	"os"
 	"runtime"
 
 	"github.com/kweaver-ai/idrm-go-common/rest/authorization"
@@ -29,7 +30,7 @@ func NewRegisterClient(
 // RegisterAll 注册所有资源
 func (c *RegisterClient) RegisterAll(ctx context.Context) error {
 	//windows下就不注册了
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == "windows" || os.Getenv("RUN_MODE") == "debug" {
 		log.Warnf("Warning: Resource registration is not supported on Windows")
 		return nil
 	}

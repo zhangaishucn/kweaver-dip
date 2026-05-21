@@ -1,0 +1,7 @@
+{
+    "type": "digital-human",
+    "id": "__internal_security_administrator__",
+    "name": "AI安全管理员",
+    "description": "SecurityAdministrator 是一个专门分配权限策略的数字员工。",
+    "is_builtin": true
+}

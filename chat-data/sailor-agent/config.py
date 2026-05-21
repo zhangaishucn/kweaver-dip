@@ -43,8 +43,8 @@ class Settings(BaseSettings):
     # 外部服务
     HYDRA_URL: str = os.getenv('HYDRA_HOST', 'http://hydra-admin:4445')
 
-    # 调试模式
-    DEBUG_MODE: bool = os.getenv('DEBUG_MODE', 'False')
+    # 调试模式（True 时 main.py 跳过内置工具箱初始化）
+    DEBUG_MODE: bool = os.getenv("DEBUG_MODE", "false").lower() in ("true", "1", "yes", "on")
 
     # 启用 rethink 工具
     ENABLE_RETHINK_TOOL: bool = os.getenv('ENABLE_RETHINK_TOOL', 'False')
@@ -99,9 +99,6 @@ class Settings(BaseSettings):
     RETURN_RECORD_LIMIT: int = 100
     RETURN_DATA_LIMIT: int = 5000
 
-    # Sandbox Settings
-    SANDBOX_URL: str = "http://sandbox-control-plane:8000"
-
     SQL_HELPER_RECALL_TOP_K: int = 5
     SQL_HELPER_DIMENSION_NUM_LIMIT: int = 30
     SQL_HELPER_FORCE_LIMIT: int = 200
@@ -124,8 +121,14 @@ class Settings(BaseSettings):
     DEFAULT_AGENT_RETRIEVAL_MAX_CONCEPTS: int = 10
     DEFAULT_AGENT_RETRIEVAL_MODE: str = "keyword_vector_retrieval"
 
-    # DIP VEGA
+    # DIP VEGA / Vega Backend（resource 元数据等）
     OUTTER_VEGA_URL: str = ""
+    VEGA_BACKEND_BASE_URL: str = os.getenv("VEGA_BACKEND_BASE_URL", "")
+
+    # 数据理解默认大模型（请求 config 未指定时作为 params.llm 后备）
+    DATA_UNDERSTAND_LLM_NAME: str = os.getenv("DATA_UNDERSTAND_LLM_NAME", "")
+    DATA_UNDERSTAND_LLM_TEMPERATURE: str = os.getenv("DATA_UNDERSTAND_LLM_TEMPERATURE", "")
+    DATA_UNDERSTAND_LLM_MAX_TOKENS: str = os.getenv("DATA_UNDERSTAND_LLM_MAX_TOKENS", "")
 
     # Embedding Settings
     EMB_URL: str = 'http://mf-model-api:9898/api/private/mf-model-api/v1/small-model/embedding'
@@ -137,7 +140,7 @@ class Settings(BaseSettings):
     KNOWLEDGE_NETWORK_API_BASE: str = "http://bkn-backend-svc:13014/api/ontology-manager"
 
     AGENT_OPERATOR_INTEGRATION_HOST: str = os.getenv("AGENT_OPERATOR_INTEGRATION_SVC_HOST", "agent-operator-integration")
-    AGENT_OPERATOR_INTEGRATION_PORT: str = os.getenv("AGENT_OPERATOR_INTEGRATION_SVC_PORT", "9000")
+    AGENT_OPERATOR_PORT: str = os.getenv("AGENT_OPERATOR_PORT", "9000")
 
 
 class Config:

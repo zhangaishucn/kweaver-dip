@@ -7,7 +7,7 @@ import asyncio
 from datetime import datetime
 from fastapi import APIRouter, Request, Body, Depends
 from fastapi.responses import JSONResponse
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 
 from app.tools.data_understand_tools.sensitive_data_detect_tools import SensitiveDataDetectTool
 from app.tools.data_understand_tools.business_object_identification_tools import BusinessObjectIdentificationTool
@@ -19,10 +19,18 @@ from app.utils.get_token import get_token
 from app.service.task_service import TaskService, TaskStatus
 from app.service.kafka_service import KafkaService
 from app.logs.logger import logger
+from app.utils.resource_view_generator import generate_form_views_from_resource_ids
+from app.utils.llm_config import merge_llm_from_config
 
 
 # 创建数据理解工具路由
 DataUnderstandAPIRouter = APIRouter()
+
+VALID_SEMANTIC_BUSINESS_REQUEST_TYPES = [
+    "regenerate_business_objects",
+    "full_understanding",
+    "semantic_complete",
+]
 
 
 @DataUnderstandAPIRouter.post(f"{DataUnderstandRouter}/sensitive_data_detect")
@@ -493,7 +501,8 @@ async def _execute_semantic_and_business_analysis_task(
         if "auth" not in params:
             params["auth"] = {}
         params["auth"]["token"] = authorization
-        
+        merge_llm_from_config(params)
+
         # 获取 request_type
         request_type = params.get("request_type", "full_understanding")
         
@@ -706,6 +715,310 @@ async def _execute_semantic_and_business_analysis_task(
             logger.error(f"发送失败消息到Kafka时发生错误: task_id={task_id}, error={str(kafka_error)}")
 
 
+def _validate_semantic_business_request_type(params: Dict[str, Any]) -> Optional[JSONResponse]:
+    request_type = params.get("request_type", "full_understanding")
+    if request_type not in VALID_SEMANTIC_BUSINESS_REQUEST_TYPES:
+        return JSONResponse(
+            content={
+                "error": (
+                    f"request_type参数无效，必须是以下值之一: "
+                    f"{', '.join(VALID_SEMANTIC_BUSINESS_REQUEST_TYPES)}"
+                )
+            },
+            status_code=400,
+        )
+    return None
+
+
+def _normalize_views_from_form_view_params(
+    params: Dict[str, Any],
+) -> Tuple[Optional[List[Dict[str, Any]]], Optional[JSONResponse]]:
+    form_view = params.get("form_view")
+    views = params.get("views", [])
+
+    if form_view:
+        if not isinstance(form_view, dict):
+            return None, JSONResponse(
+                content={"error": "form_view参数必须是对象"},
+                status_code=400,
+            )
+        return [form_view], None
+
+    if not views:
+        return None, JSONResponse(
+            content={"error": "form_view或views参数不能为空"},
+            status_code=400,
+        )
+
+    if not isinstance(views, list):
+        return None, JSONResponse(
+            content={"error": "views参数必须是列表"},
+            status_code=400,
+        )
+
+    return views, None
+
+
+def _extract_view_ids_from_params(
+    params: Dict[str, Any],
+) -> Tuple[Optional[List[str]], Optional[JSONResponse]]:
+    view_ids_param = params.get("view_ids") or params.get("resource_ids")
+
+    if not view_ids_param:
+        return None, JSONResponse(
+            content={"error": "view_ids（Vega Resource ID）不能为空"},
+            status_code=400,
+        )
+
+    if not isinstance(view_ids_param, list) or not view_ids_param:
+        return None, JSONResponse(
+            content={"error": "view_ids 必须是非空列表"},
+            status_code=400,
+        )
+
+    view_ids = []
+    for view_id in view_ids_param:
+        if not isinstance(view_id, str) or not view_id.strip():
+            return None, JSONResponse(
+                content={"error": "view_ids 列表中的每个元素必须是有效字符串"},
+                status_code=400,
+            )
+        view_ids.append(view_id.strip())
+
+    return view_ids, None
+
+
+async def _load_form_views_by_resource_ids(
+    resource_ids: List[str],
+    authorization: Optional[str],
+) -> Tuple[Optional[List[Dict[str, Any]]], Optional[JSONResponse]]:
+    """通过 Vega Backend GET /resources/{ids} 拉取元数据并转为 form_view。"""
+    if not authorization:
+        return None, JSONResponse(
+            content={"error": "Authorization header is required"},
+            status_code=401,
+        )
+
+    try:
+        views = await generate_form_views_from_resource_ids(
+            resource_ids,
+            authorization,
+        )
+    except Exception as e:
+        logger.error(
+            "根据 resource id 加载元数据失败: resource_ids=%s, error=%s",
+            resource_ids,
+            e,
+        )
+        return None, JSONResponse(
+            content={"error": f"获取 resource 详情失败: {e}"},
+            status_code=400,
+        )
+
+    return views, None
+
+
+async def _resolve_params_with_view_ids(
+    params: Dict[str, Any],
+    authorization: Optional[str],
+) -> Tuple[Optional[Dict[str, Any]], Optional[JSONResponse]]:
+    view_ids, error = _extract_view_ids_from_params(params)
+    if error:
+        return None, error
+
+    views, error = await _load_form_views_by_resource_ids(view_ids, authorization)
+    if error:
+        return None, error
+
+    resolved_params = dict(params)
+    resolved_params["views"] = views
+    if len(views) == 1:
+        resolved_params["form_view"] = views[0]
+    merge_llm_from_config(resolved_params)
+    return resolved_params, None
+
+
+def _start_semantic_and_business_analysis_task(
+    params: Dict[str, Any],
+    authorization: Optional[str],
+    message_id: Optional[str],
+) -> JSONResponse:
+    merge_llm_from_config(params)
+    task_service = TaskService()
+    user_id = params.get("auth", {}).get("user_id", "")
+    task_id = task_service.create_task(
+        task_type="semantic_and_business_analysis",
+        params=params,
+        user_id=user_id,
+    )
+
+    asyncio.create_task(
+        _execute_semantic_and_business_analysis_task(
+            task_id=task_id,
+            params=params,
+            authorization=authorization,
+            message_id=message_id,
+        )
+    )
+
+    response_content = {
+        "task_id": task_id,
+        "status": "pending",
+        "message": "任务已创建，正在后台执行",
+    }
+    if message_id:
+        response_content["message_id"] = message_id
+
+    return JSONResponse(content=response_content, status_code=202)
+
+
+async def _execute_semantic_and_business_analysis_sync(
+    params: Dict[str, Any],
+    authorization: str,
+    message_id: Optional[str] = None,
+) -> JSONResponse:
+    views, error = _normalize_views_from_form_view_params(params)
+    if error:
+        return error
+
+    original_form_view = params.get("form_view") or (views[0] if views else {})
+    request_type = params.get("request_type", "full_understanding")
+
+    try:
+        if "auth" not in params:
+            params["auth"] = {}
+        params["auth"]["token"] = authorization
+        params["views"] = views
+        merge_llm_from_config(params)
+
+        semantic_result = None
+        business_result = None
+
+        if request_type == "full_understanding":
+            old_format_views = _convert_views_to_old_format(views)
+            business_params = params.copy()
+            business_params["views"] = old_format_views
+
+            semantic_result = await SemanticCompleteTool.as_async_api_cls_with_views(params)
+            business_result = await BusinessObjectIdentificationTool.as_async_api_cls_with_views(
+                business_params
+            )
+
+        elif request_type == "regenerate_business_objects":
+            old_format_views = _convert_views_to_old_format(views)
+            business_params = params.copy()
+            business_params["views"] = old_format_views
+
+            business_result = await BusinessObjectIdentificationTool.as_async_api_cls_with_views(
+                business_params
+            )
+
+        elif request_type == "semantic_complete":
+            semantic_result = await SemanticCompleteTool.as_async_api_cls_with_views(params)
+
+        result = {}
+
+        if semantic_result:
+            semantic_result_data = semantic_result.get("result", {})
+            semantic_views = semantic_result_data.get("views", [])
+            semantic_view_result = semantic_views[0] if semantic_views else {}
+
+            result["semantic_completion_result"] = {
+                "form_view": semantic_view_result,
+                "summary": semantic_result_data.get("summary", {}),
+                "summary_text": semantic_result.get("summary_text", ""),
+                "result_cache_key": semantic_result.get("result_cache_key", ""),
+            }
+
+        if business_result:
+            business_result_data = business_result.get("result", {})
+            views_or_tables = (
+                business_result_data.get("views")
+                or business_result_data.get("tables", [])
+            )
+
+            business_object_result = {}
+            for view_or_table in views_or_tables:
+                if view_or_table.get("is_business_object", False):
+                    business_object_result = {
+                        **view_or_table.get("business_object", {}),
+                        **view_or_table.get("object_attributes", {}),
+                        **view_or_table.get("business_characteristics", {}),
+                    }
+                    break
+
+            result["business_object_identification_result"] = {
+                "business_object": business_object_result,
+                "summary": business_result_data.get(
+                    "summary", business_result_data.get("business_objects_summary", {})
+                ),
+                "summary_text": business_result.get("summary_text", ""),
+                "result_cache_key": business_result.get("result_cache_key", ""),
+            }
+
+        try:
+            from config import settings
+            from app.service.kafka_service import KAFKA_AVAILABLE
+
+            if KAFKA_AVAILABLE:
+                kafka_service = KafkaService()
+
+                kafka_message = _transform_result_to_kafka_format(
+                    form_view=original_form_view,
+                    semantic_result=semantic_result,
+                    business_result=business_result,
+                    request_type=request_type,
+                    message_id=message_id,
+                    status="success",
+                )
+
+                topic = getattr(
+                    settings,
+                    "KAFKA_DATA_UNDERSTAND_RESULT_TOPIC",
+                    "data-understanding-responses",
+                )
+                success = kafka_service.send_message(
+                    topic=topic,
+                    message=kafka_message,
+                    key=message_id or "sync_request",
+                )
+
+                if success:
+                    logger.info(f"同步接口结果已发送到Kafka: topic={topic}")
+                else:
+                    logger.warning(f"同步接口结果发送到Kafka失败: topic={topic}")
+
+                kafka_service.close()
+            else:
+                logger.warning("Kafka不可用，跳过发送结果到Kafka")
+
+        except ImportError:
+            logger.warning("Kafka服务未安装，跳过发送结果到Kafka")
+        except Exception as kafka_error:
+            logger.error(f"发送结果到Kafka时发生错误: error={str(kafka_error)}")
+            import traceback
+            logger.error(traceback.format_exc())
+
+        return JSONResponse(content=result, status_code=200)
+
+    except Exception as e:
+        logger.error(f"同步接口执行失败: error={str(e)}")
+        import traceback
+        error_msg = f"{str(e)}\n{traceback.format_exc()}"
+
+        try:
+            _send_failed_kafka_message(
+                "sync_request", original_form_view, request_type, message_id, str(e)
+            )
+        except Exception as kafka_error:
+            logger.error(f"发送失败消息到Kafka时发生错误: error={str(kafka_error)}")
+
+        return JSONResponse(
+            content={"error": f"执行失败: {str(e)}"},
+            status_code=500,
+        )
+
+
 @DataUnderstandAPIRouter.post(f"{DataUnderstandRouter}/view_semantic_and_business_analysis")
 async def view_semantic_and_business_analysis_api(
     request: Request,
@@ -724,79 +1037,27 @@ async def view_semantic_and_business_analysis_api(
         - "full_understanding": 语义理解和业务对象（默认）
         - "semantic_complete": 只语义理解
     - message_id: 消息ID，用于写入Kafka（可选）
-    - 其他参数：auth, config, query 等
+    - config: 大模型 name / temperature / max_tokens（或 config.llm 对象）
+    - 其他参数：auth, query 等
     """
-    authorization = request.headers.get('Authorization')
-    
-    # 验证 request_type 参数
-    request_type = params.get("request_type", "full_understanding")
-    valid_request_types = ["regenerate_business_objects", "full_understanding", "semantic_complete"]
-    if request_type not in valid_request_types:
-        return JSONResponse(
-            content={
-                "error": f"request_type参数无效，必须是以下值之一: {', '.join(valid_request_types)}"
-            },
-            status_code=400
-        )
-    
-    # 验证参数：接受单个 form_view 或 views 列表（兼容旧格式）
-    form_view = params.get("form_view")
-    views = params.get("views", [])
-    
-    # 如果提供了 form_view，转换为列表格式
-    if form_view:
-        if not isinstance(form_view, dict):
-            return JSONResponse(
-                content={"error": "form_view参数必须是对象"},
-                status_code=400
-            )
-        views = [form_view]
-    elif not views:
-        return JSONResponse(
-            content={"error": "form_view或views参数不能为空"},
-            status_code=400
-        )
-    
-    # 确保 views 是列表格式
-    if not isinstance(views, list):
-        return JSONResponse(
-            content={"error": "views参数必须是列表"},
-            status_code=400
-        )
-    
-    # 提取 message_id（可选参数）
+    authorization = request.headers.get("Authorization")
+
+    error = _validate_semantic_business_request_type(params)
+    if error:
+        return error
+
+    merge_llm_from_config(params)
+
+    views, error = _normalize_views_from_form_view_params(params)
+    if error:
+        return error
+
+    params["views"] = views
+    if len(views) == 1:
+        params["form_view"] = views[0]
+
     message_id = params.get("message_id")
-    
-    # 创建任务
-    task_service = TaskService()
-    user_id = params.get("auth", {}).get("user_id", "")
-    task_id = task_service.create_task(
-        task_type="semantic_and_business_analysis",
-        params=params,
-        user_id=user_id
-    )
-    
-    # 在后台异步执行任务
-    asyncio.create_task(_execute_semantic_and_business_analysis_task(
-        task_id=task_id,
-        params=params,
-        authorization=authorization,
-        message_id=message_id
-    ))
-    
-    # 立即返回任务ID和message_id
-    response_content = {
-        "task_id": task_id,
-        "status": "pending",
-        "message": "任务已创建，正在后台执行"
-    }
-    if message_id:
-        response_content["message_id"] = message_id
-    
-    return JSONResponse(
-        content=response_content,
-        status_code=202  # 202 Accepted
-    )
+    return _start_semantic_and_business_analysis_task(params, authorization, message_id)
 
 
 @DataUnderstandAPIRouter.post(f"{DataUnderstandRouter}/view_semantic_and_business_analysis_sync")
@@ -816,200 +1077,68 @@ async def view_semantic_and_business_analysis_sync_api(
         - "regenerate_business_objects": 只识别业务对象
         - "full_understanding": 语义理解和业务对象（默认）
     - message_id: 消息ID，用于写入Kafka（可选）
-    - 其他参数：auth, config, query 等
+    - config: 大模型 name / temperature / max_tokens 等
+    - 其他参数：auth, query 等
     
     返回：
     - 直接返回分析结果，包含语义补全和业务对象识别结果
     """
-    authorization = request.headers.get('Authorization', "")
-    
-    # 验证 request_type 参数
-    request_type = params.get("request_type", "full_understanding")
-    valid_request_types = ["regenerate_business_objects", "full_understanding", "semantic_complete"]
-    if request_type not in valid_request_types:
-        return JSONResponse(
-            content={
-                "error": f"request_type参数无效，必须是以下值之一: {', '.join(valid_request_types)}"
-            },
-            status_code=400
-        )
-    
-    # 验证参数：接受单个 form_view 或 views 列表（兼容旧格式）
-    form_view = params.get("form_view")
-    views = params.get("views", [])
-    
-    # 如果提供了 form_view，转换为列表格式
-    if form_view:
-        if not isinstance(form_view, dict):
-            return JSONResponse(
-                content={"error": "form_view参数必须是对象"},
-                status_code=400
-            )
-        views = [form_view]
-    elif not views:
-        return JSONResponse(
-            content={"error": "form_view或views参数不能为空"},
-            status_code=400
-        )
-    
-    # 确保 views 是列表格式
-    if not isinstance(views, list):
-        return JSONResponse(
-            content={"error": "views参数必须是列表"},
-            status_code=400
-        )
-    
-    # 提取 message_id（可选参数）
-    message_id = params.get("message_id")
-    
-    # 保存原始 form_view 用于后续 Kafka 消息
-    original_form_view = form_view if form_view else (views[0] if views else {})
-    
-    try:
-        # 准备参数，将 token 放入 auth 中
-        if "auth" not in params:
-            params["auth"] = {}
-        params["auth"]["token"] = authorization
-        
-        # 更新 params，确保 views 是列表格式
-        params["views"] = views
-        
-        semantic_result = None
-        business_result = None
-        
-        # 根据 request_type 决定执行哪些工具
-        if request_type == "full_understanding":
-            # 执行语义补全和业务对象识别
-            old_format_views = _convert_views_to_old_format(views)
-            # 为业务对象识别准备参数
-            business_params = params.copy()
-            business_params["views"] = old_format_views
-            
-            # 调用语义补全工具（使用新格式）
-            semantic_result = await SemanticCompleteTool.as_async_api_cls_with_views(params)
-            
-            # 调用业务对象识别工具（使用旧格式）
-            business_result = await BusinessObjectIdentificationTool.as_async_api_cls_with_views(business_params)
-            
-        elif request_type == "regenerate_business_objects":
-            # 只执行业务对象识别
-            old_format_views = _convert_views_to_old_format(views)
-            # 为业务对象识别准备参数
-            business_params = params.copy()
-            business_params["views"] = old_format_views
-            
-            # 只调用业务对象识别工具（使用旧格式）
-            business_result = await BusinessObjectIdentificationTool.as_async_api_cls_with_views(business_params)
+    authorization = request.headers.get("Authorization", "")
 
-        elif request_type == "semantic_complete":
-            # 只执行语义补全（使用新格式）
-            semantic_result = await SemanticCompleteTool.as_async_api_cls_with_views(params)
-        
-        # 组装结果（单个 view 的格式）
-        result = {}
-        
-        # 如果有语义补全结果，提取第一个 view
-        if semantic_result:
-            semantic_result_data = semantic_result.get("result", {})
-            semantic_views = semantic_result_data.get("views", [])
-            semantic_view_result = semantic_views[0] if semantic_views else {}
-            
-            result["semantic_completion_result"] = {
-                "form_view": semantic_view_result,
-                "summary": semantic_result_data.get("summary", {}),
-                "summary_text": semantic_result.get("summary_text", ""),
-                "result_cache_key": semantic_result.get("result_cache_key", "")
-            }
-        
-        # 如果有业务对象识别结果，提取第一个对象
-        if business_result:
-            business_result_data = business_result.get("result", {})
-            # 兼容新格式（views）和旧格式（tables）
-            views_or_tables = (business_result_data.get("views") or 
-                             business_result_data.get("tables", []))
-            
-            # 找到第一个业务对象
-            business_object_result = {}
-            for view_or_table in views_or_tables:
-                if view_or_table.get("is_business_object", False):
-                    # 合并 business_object, object_attributes, business_characteristics
-                    business_object_result = {
-                        **view_or_table.get("business_object", {}),
-                        **view_or_table.get("object_attributes", {}),
-                        **view_or_table.get("business_characteristics", {})
-                    }
-                    break
-            
-            result["business_object_identification_result"] = {
-                "business_object": business_object_result,
-                "summary": business_result_data.get("summary", business_result_data.get("business_objects_summary", {})),
-                "summary_text": business_result.get("summary_text", ""),
-                "result_cache_key": business_result.get("result_cache_key", "")
-            }
-        
-        # 将结果发送到Kafka（异步执行，失败不影响返回结果）
-        try:
-            from config import settings
-            from app.service.kafka_service import KAFKA_AVAILABLE
-            
-            if KAFKA_AVAILABLE:
-                kafka_service = KafkaService()
-                
-                # 转换结果为 Kafka 消息格式
-                kafka_message = _transform_result_to_kafka_format(
-                    form_view=original_form_view,
-                    semantic_result=semantic_result,
-                    business_result=business_result,
-                    request_type=request_type,
-                    message_id=message_id,
-                    status="success"
-                )
-                
-                # 发送到Kafka主题
-                topic = getattr(settings, 'KAFKA_DATA_UNDERSTAND_RESULT_TOPIC', 'data-understanding-responses')
-                success = kafka_service.send_message(
-                    topic=topic,
-                    message=kafka_message,
-                    key=message_id or "sync_request"  # 使用message_id或默认key
-                )
-                
-                if success:
-                    logger.info(f"同步接口结果已发送到Kafka: topic={topic}")
-                else:
-                    logger.warning(f"同步接口结果发送到Kafka失败: topic={topic}")
-                
-                # 关闭Kafka连接
-                kafka_service.close()
-            else:
-                logger.warning(f"Kafka不可用，跳过发送结果到Kafka")
-            
-        except ImportError:
-            # Kafka服务未安装
-            logger.warning(f"Kafka服务未安装，跳过发送结果到Kafka")
-        except Exception as kafka_error:
-            # Kafka发送失败不应该影响返回结果
-            logger.error(f"发送结果到Kafka时发生错误: error={str(kafka_error)}")
-            import traceback
-            logger.error(traceback.format_exc())
-        
-        # 返回结果
-        return JSONResponse(content=result, status_code=200)
-        
-    except Exception as e:
-        logger.error(f"同步接口执行失败: error={str(e)}")
-        import traceback
-        error_msg = f"{str(e)}\n{traceback.format_exc()}"
-        
-        # 发送失败消息到 Kafka
-        try:
-            _send_failed_kafka_message("sync_request", original_form_view, request_type, message_id, str(e))
-        except Exception as kafka_error:
-            logger.error(f"发送失败消息到Kafka时发生错误: error={str(kafka_error)}")
-        
-        return JSONResponse(
-            content={"error": f"执行失败: {str(e)}"},
-            status_code=500
-        )
+    error = _validate_semantic_business_request_type(params)
+    if error:
+        return error
+
+    merge_llm_from_config(params)
+
+    views, error = _normalize_views_from_form_view_params(params)
+    if error:
+        return error
+
+    params["views"] = views
+    if len(views) == 1:
+        params["form_view"] = views[0]
+
+    message_id = params.get("message_id")
+    return await _execute_semantic_and_business_analysis_sync(
+        params, authorization, message_id
+    )
+
+
+@DataUnderstandAPIRouter.post(f"{DataUnderstandRouter}/view_id_semantic_and_business_analysis")
+async def view_id_semantic_and_business_analysis_api(
+    request: Request,
+    params: Dict[str, Any] = Body(...),
+):
+    """
+    逻辑视图语义补全和业务对象识别接口（异步任务模式，按 Resource ID）
+
+    根据 Vega Backend Resource ID（view_ids 参数）调用
+    GET /api/vega-backend/v1/resources/{ids} 拉取表/资源元数据（含 schema_definition），
+    转为 form_view 后执行分析；行为与 view_semantic_and_business_analysis 一致。
+
+    输入参数：
+    - view_ids: Vega Resource ID 列表（必填，逗号分隔批量拉取）
+    - request_type: full_understanding | regenerate_business_objects | semantic_complete
+    - config.name / config.temperature / config.max_tokens: 大模型参数（也可用 config.llm）
+    - message_id: 可选
+    """
+    authorization = request.headers.get("Authorization")
+
+    error = _validate_semantic_business_request_type(params)
+    if error:
+        return error
+
+    merge_llm_from_config(params)
+
+    resolved_params, error = await _resolve_params_with_view_ids(params, authorization)
+    if error:
+        return error
+
+    message_id = resolved_params.get("message_id")
+    return _start_semantic_and_business_analysis_task(
+        resolved_params, authorization, message_id
+    )
 
 
 @DataUnderstandAPIRouter.get(f"{DataUnderstandRouter}/task/{{task_id}}/status")

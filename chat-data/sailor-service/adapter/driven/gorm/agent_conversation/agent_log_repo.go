@@ -52,8 +52,8 @@ func (r *repo) ListAgentConversationLogList(ctx context.Context, filter llmDrive
 
 	whereSQL := strings.Join(conditions, " AND ")
 	countSQL := fmt.Sprintf(
-		"select count(1) from adp.t_data_agent_conversation_message m "+
-			"join adp.t_data_agent_conversation c on c.f_id = m.f_conversation_id "+
+		"select count(1) from kweaver.t_data_agent_conversation_message m "+
+			"join kweaver.t_data_agent_conversation c on c.f_id = m.f_conversation_id "+
 			"where %s",
 		whereSQL,
 	)
@@ -84,8 +84,8 @@ func (r *repo) ListAgentConversationLogList(ctx context.Context, filter llmDrive
 			"	m.f_role as role, "+
 			"	m.f_content as content, "+
 			"	m.f_ext as ext "+
-			"from adp.t_data_agent_conversation_message m "+
-			"join adp.t_data_agent_conversation c on c.f_id = m.f_conversation_id "+
+			"from kweaver.t_data_agent_conversation_message m "+
+			"join kweaver.t_data_agent_conversation c on c.f_id = m.f_conversation_id "+
 			"where %s "+
 			"order by %s %s, m.f_index %s "+
 			"limit ? offset ?",

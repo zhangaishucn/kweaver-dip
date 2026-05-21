@@ -80,7 +80,6 @@ func LocalToken() gin.HandlerFunc {
 
 func (r *Router) RegisterApi(engine *gin.Engine) {
 	router := engine.Group("/api/auth-service/v1", r.Middleware.TokenInterception())
-	router.Use(r.Middleware.AuditLogger())
 	routerInternal := engine.Group("/api/internal/auth-service/v1")
 
 	{
@@ -92,7 +91,6 @@ func (r *Router) RegisterApi(engine *gin.Engine) {
 
 		//资源接口
 		router.GET("/subject/objects", r.AuthV2Controller.GetObjectsBySubjectId)             // 访问者拥有的资源
-		router.GET("/sub-views", r.AuthV2Controller.ListSubViews)                            // 获取拥有指定动作权限的子视图列表
 		router.GET("/menu-resource/actions", r.AuthV2Controller.MenuResourceActions)         //查询菜单资源的允许的操作
 		router.POST("/data-resource/operations", r.AuthV2Controller.UserOperationBatchCheck) //数据资源批量策略验证
 		//策略验证
@@ -108,7 +106,8 @@ func (r *Router) RegisterApi(engine *gin.Engine) {
 
 		// 数据资源授权申请
 		dataAuthRouter := router.Group("/data-auth")
-		dataAuthRouter.POST("/apply", r.DataAuthV2.Apply) // 申请权限
+		dataAuthRouter.POST("/apply", r.DataAuthV2.Apply)                 // 申请权限
+		dataAuthRouter.POST("/operation", r.DataAuthV2.ApprovalOperation) // 审核通过后操作
 	}
 
 }

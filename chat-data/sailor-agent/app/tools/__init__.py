@@ -13,10 +13,10 @@ from .query_mind import (
     KnowledgeItemTool,
     SQLHelperTool,
 )
-from .sandbox_tools.toolkit import ExecuteCodeTool, CreateFileTool, ReadFileTool, ListFilesTool
 from .basic_tools import IntentRouterTool
 from .memory_tools import MemorySearchTool, MemoryWriteTool
 from .todo_list import TodoListTool, TaskManagerTool
+from .forecasting.smart_forecasting import ForecastingTool
 
 _TOOLS_MAPPING = {
     "af_sailor": AfSailorTool,
@@ -40,13 +40,10 @@ _TOOLS_MAPPING = {
     "get_metadata": GetMetadataTool,
     "knowledge_item": KnowledgeItemTool,
     "sql_helper": SQLHelperTool,
-    "execute_code": ExecuteCodeTool,
-    "create_file": CreateFileTool,
-    "read_file": ReadFileTool,
-    "list_files": ListFilesTool,
     "intent_router": IntentRouterTool,
     "memory_search": MemorySearchTool,
     "memory_write": MemoryWriteTool,
     "todo_list": TodoListTool,
     "task_manager": TaskManagerTool,
+    "smart_forecasting": ForecastingTool,
 }

@@ -180,6 +180,12 @@ class MemoryService:
 
         self._with_repo(_inner)
 
+    def get_document_by_id(self, doc_id: str) -> MemoryDocumentDTO | None:
+        def _inner(repo: MemoryRepository) -> MemoryDocumentDTO | None:
+            return repo.get_document_by_id(doc_id)
+
+        return self._with_repo(_inner)
+
     def list_user_memories(
         self,
         user_id: str,

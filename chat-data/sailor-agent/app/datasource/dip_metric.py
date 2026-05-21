@@ -2,7 +2,7 @@
 # @Author:  Xavier.chen@aishu.cn
 # @Date: 2024-8-26
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from datetime import datetime
 import pandas as pd
 from typing import Tuple
@@ -397,20 +397,29 @@ class DIPMetric(APIDataSource):
         return description
 
     def get_details(self, input_query: str = "", metric_num_limit: int = 5,
-                    input_dimension_num_limit: int = 30) -> Dict[str, Any]:
+                    input_dimension_num_limit: int = 30,
+                    metric_ids_override: Optional[List[str]] = None) -> Dict[str, Any]:
         """获取详细信息"""
         # 同步版本直接调用异步版本
-        return run_blocking(self.aget_details(input_query, metric_num_limit, input_dimension_num_limit))
+        return run_blocking(self.aget_details(
+            input_query, metric_num_limit, input_dimension_num_limit, metric_ids_override))
 
     async def aget_details(self, input_query: str = "", metric_num_limit: int = 5,
-                           input_dimension_num_limit: int = 30) -> Dict[str, Any]:
-        """异步获取详细信息"""
+                           input_dimension_num_limit: int = 30,
+                           metric_ids_override: Optional[List[str]] = None) -> Dict[str, Any]:
+        """异步获取详细信息
+
+        metric_ids_override:
+            若传入非空列表，则仅对这些指标 ID 拉取详情并参与后续降维；
+            若为 None，则使用 self.metric_list。
+        """
         details = []
         # 如果有指标列表，获取详细信息
 
         raw_details = []
-        if self.metric_list:
-            raw_details = await self.aget_description_by_ids(self.metric_list)
+        active_metric_ids = metric_ids_override if metric_ids_override is not None else self.metric_list
+        if active_metric_ids:
+            raw_details = await self.aget_description_by_ids(active_metric_ids)
 
             # 分离 sql 和非 sql 类型的指标
             sql_metrics = []

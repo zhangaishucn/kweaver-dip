@@ -198,14 +198,15 @@ prompts = {
 
 class RewriteMetricQueryPrompt(BasePrompt):
     """RewriteMetricQuery Prompt
-    There are three variables in the prompt:
-    - metrics: dict, the metrics that need to be analyzed
-    - question: str, the question
-    - samples: list, the samples
+    - metrics: 指标列表或已序列化字符串
+    - question: 用户问题
+    - samples: BKN 样例结构，多为 {\"mapping\": [], \"data\": []}，与 text2metric 中 sample_data 一致
+    - sample_data: 供 Jinja 模板渲染的字符串（由 samples 在 __init__ 中生成）
     """
     metrics: Any = ""
     question: str = ""
-    samples: list = []
+    samples: Any = []
+    sample_data: str = ""
     templates: dict = prompts
     language: str = "cn"
     name: str = "rewrite-query"
@@ -217,6 +218,14 @@ class RewriteMetricQueryPrompt(BasePrompt):
         super().__init__(*args, **kwargs)
         now_time = datetime.now()
         self.current_date_time = now_time.strftime("%Y-%m-%d %H:%M:%S")
+
+        s = self.samples
+        if s is None or s == [] or s == {}:
+            self.sample_data = ""
+        elif isinstance(s, (dict, list)):
+            self.sample_data = json.dumps(s, ensure_ascii=False)
+        else:
+            self.sample_data = str(s)
 
         if isinstance(self.metrics, dict):
             self.metrics = json.dumps(self.metrics, ensure_ascii=False)

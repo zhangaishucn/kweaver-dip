@@ -196,13 +196,21 @@ class ADPService(object):
         }
 
         try:
-            res = requests.post(url, json=body, headers=headers)
-            if res:
-                return res.json()
-            else:
+            res = requests.post(url, json=body, headers=headers, timeout=60)
+            # 注意：bool(Response) 等价于 res.ok（仅 200<=status<400 为 True）。
+            # 4xx/5xx 时原逻辑直接 return {} 且无日志，易被误判为「检索无命中」。
+            if not res.ok:
+                preview = (res.text or "")[:500]
+                logger.error(
+                    "ontology-query object-types 请求失败: status=%s url=%s body_preview=%r",
+                    res.status_code,
+                    url,
+                    preview,
+                )
                 return {}
+            return res.json()
         except Exception as e:
-            logger.error(f"Agent list request failed: {str(e)}")
+            logger.error(f"dip_ontology_query_by_object_types 请求异常: {str(e)}")
             return {}
 
     def get_adp_embedding(self, input_text_list):

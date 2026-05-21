@@ -150,6 +150,39 @@ class IntentRouterArgs(BaseModel):
 _SETTINGS = get_settings()
 SQL_RISK_KEYWORDS = ("delete", "update", "insert", "alter", "drop")
 
+# 字段消歧本体检索（metadata fields match）单次返回条数上限
+ONTOLOGY_FIELD_CLARIFY_MATCH_LIMIT = 100
+
+# 括号内业务名与名词比对前，从名词末尾剥离的泛化词（剥离后剩余为「核心词」，须与业务名有重叠）
+_FIELD_LABEL_GENERIC_SUFFIXES: Tuple[str, ...] = (
+    "信息",
+    "数据",
+    "情况",
+    "状态",
+    "内容",
+    "明细",
+    "名单",
+    "列表",
+    "记录",
+    "资料",
+    "说明",
+    "描述",
+    "类型",
+    "名称",
+    "编号",
+    "代码",
+    "金额",
+    "数量",
+    "时间",
+    "日期",
+    "年度",
+    "月份",
+    "概况",
+    "摘要",
+    "结果",
+    "报表",
+)
+
 
 class IntentRouterTool(LLMTool):
     """
@@ -234,7 +267,7 @@ class IntentRouterTool(LLMTool):
             "安全审查：检测到疑似 SQL 高危操作请求，已拦截处理。\n"
             f"原因：{reason}"
         )
-        return {
+        blocked: Dict[str, Any] = {
             "intent": "",
             "confidence": 1.0,
             "slots": self._extract_slots(query),
@@ -255,6 +288,33 @@ class IntentRouterTool(LLMTool):
                 "risk_keywords": list(SQL_RISK_KEYWORDS),
             },
         }
+        IntentRouterTool._sync_field_clarify_flags(blocked)
+        return blocked
+
+    @staticmethod
+    def _sync_field_clarify_flags(result: Dict[str, Any]) -> None:
+        """field_clarify 非空时置 field_need_clarify，并强制 need_clarify。"""
+        fc = result.get("field_clarify")
+        has_fc = isinstance(fc, list) and len(fc) > 0
+        result["field_need_clarify"] = bool(has_fc)
+        if has_fc:
+            result["need_clarify"] = True
+
+    @staticmethod
+    def _refresh_router_summary(query: str, result: Dict[str, Any]) -> None:
+        """按当前 need_clarify / field_need_clarify 等字段重算 summary_text。"""
+        result["summary_text"] = IntentRouterTool._build_summary_text(
+            query=query,
+            intent=str(result.get("intent", "") or ""),
+            confidence=float(result.get("confidence", 0.0) or 0.0),
+            slots=result.get("slots", {}) if isinstance(result.get("slots"), dict) else {},
+            is_unknown=bool(result.get("is_unknown", False)),
+            need_clarify=bool(result.get("need_clarify", False)),
+            clarify_questions=result.get("clarify_questions", []) or [],
+            intent_need_clarify=bool(result.get("intent_need_clarify", False)),
+            condition_need_clarify=bool(result.get("condition_need_clarify", False)),
+            field_need_clarify=bool(result.get("field_need_clarify", False)),
+        )
 
     @staticmethod
     def _build_summary_text(
@@ -267,6 +327,7 @@ class IntentRouterTool(LLMTool):
         clarify_questions: List[str],
         intent_need_clarify: bool = False,
         condition_need_clarify: bool = False,
+        field_need_clarify: bool = False,
     ) -> str:
         """构造面向用户/调用方的中文总结文本。"""
         q = (query or "").strip()
@@ -276,7 +337,9 @@ class IntentRouterTool(LLMTool):
             parts.append(f"用户问题：{q}")
 
         if need_clarify:
-            if intent_need_clarify and condition_need_clarify:
+            if field_need_clarify and not intent_need_clarify and not condition_need_clarify:
+                parts.append(f"意图识别：{intent or '—'}（置信度 {confidence:.4f}）。")
+            elif intent_need_clarify and condition_need_clarify:
                 parts.append("意图识别：意图与关键条件均需进一步澄清。")
             elif intent_need_clarify:
                 if is_unknown:
@@ -305,6 +368,9 @@ class IntentRouterTool(LLMTool):
             qs = [str(x).strip() for x in clarify_questions if str(x).strip()]
             if qs:
                 parts.append("澄清问题：" + " / ".join(qs[:2]))
+
+        if field_need_clarify:
+            parts.append("字段口径：需根据 field_clarify 选项确认。")
 
         return "\n".join(parts).strip()
 
@@ -441,6 +507,242 @@ class IntentRouterTool(LLMTool):
             # LLM 返回非 JSON 时，做最小兜底：按顿号/逗号分割
             rough = re.split(r"[，,、；;\n\t ]+", text)
             return self._normalize_nouns(rough)
+
+    async def _llm_judge_field_ambiguity(
+        self,
+        query: str,
+        noun_phrase: str,
+        candidate_labels: List[str],
+    ) -> bool:
+        """
+        在 _ontology_field_label_matches_noun 筛出候选业务字段名之后，
+        由大模型判断当前用户问题语境下该名词是否确需字段消歧（多种口径需用户选择）。
+        candidate_labels 不含「其他」，为 Top 相似度字段名列表。
+        """
+        labels = [str(x).strip() for x in candidate_labels if str(x).strip()]
+        if not labels:
+            return False
+        if not getattr(self, "llm", None):
+            return len(labels) >= 2
+
+        q = (query or "").strip()
+        labels_joined = "、".join(labels)
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                SystemMessage(
+                    content=(
+                        "你是数据查询场景下的术语消歧助手。"
+                        "用户问题中有一个名词或短语；元数据检索已给出若干可能对应的业务字段名（已通过规则初筛）。"
+                        "请判断：在该问题的语境下，这个表述是否确实存在多种不同字段含义、需要让用户在候选中明确选择其一。"
+                        "若语义清晰、实质上只对应一种合理口径，或候选虽多个但无需用户再选即可继续理解，则判为无歧义。"
+                        "仅输出 JSON：{\"ambiguous\": true} 或 {\"ambiguous\": false}，不要输出其他文字。"
+                    )
+                ),
+                HumanMessagePromptTemplate.from_template(
+                    "用户问题：{query}\n"
+                    "用户表述中的名词/短语：{noun}\n"
+                    "候选业务字段名（已初筛）：{labels}"
+                ),
+            ]
+        )
+        messages = prompt.format_messages(query=q, noun=noun_phrase, labels=labels_joined)
+        resp = await self.llm.ainvoke(messages)
+        content = getattr(resp, "content", "") or ""
+        text = content.strip()
+        if not text.startswith("{"):
+            l = text.find("{")
+            r = text.rfind("}")
+            if l != -1 and r != -1 and r > l:
+                text = text[l : r + 1]
+        try:
+            parsed = json.loads(text)
+            return bool(parsed.get("ambiguous", False))
+        except Exception:
+            return len(labels) >= 2
+
+    @staticmethod
+    def _merge_field_clarify_lexicon_and_ontology(
+        lexicon: List[Dict[str, Any]], ontology: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """词典项优先；本体检索项按 field 去重追加，统一为 field/question/options/chose_type。"""
+        seen = {
+            str(item.get("field", "") or "").strip()
+            for item in lexicon
+            if str(item.get("field", "") or "").strip()
+        }
+        out: List[Dict[str, Any]] = list(lexicon)
+        for item in ontology:
+            f = str(item.get("field", "") or "").strip()
+            if f and f not in seen:
+                seen.add(f)
+                out.append(item)
+        return out
+
+    @staticmethod
+    def _ontology_strip_trailing_generics(phrase: str) -> str:
+        """从短语末尾反复去掉泛化后缀，得到用于与业务名比对的核心部分。"""
+        s = (phrase or "").strip()
+        while True:
+            stripped = False
+            for suf in _FIELD_LABEL_GENERIC_SUFFIXES:
+                if s.endswith(suf) and len(s) > len(suf):
+                    s = s[: -len(suf)]
+                    stripped = True
+                    break
+            if not stripped:
+                break
+        return s
+
+    @staticmethod
+    def _ontology_noun_core_stem(noun_phrase: str) -> Optional[str]:
+        """
+        名词去掉末尾泛化后缀后的核心词；过短或仅剩泛化词则返回 None。
+        """
+        stem = IntentRouterTool._ontology_strip_trailing_generics(noun_phrase)
+        if not stem or len(stem) < 2:
+            return None
+        if stem in _FIELD_LABEL_GENERIC_SUFFIXES:
+            return None
+        return stem
+
+    @staticmethod
+    def _ontology_core_overlaps_label(core: str, label_inner: str) -> bool:
+        """核心词与业务名有重叠：核心整体为子串，或核心内任一连贯二字出现在业务名中。"""
+        lb = (label_inner or "").strip()
+        c = (core or "").strip()
+        if not c or not lb:
+            return False
+        if c in lb:
+            return True
+        if len(c) >= 2:
+            for i in range(len(c) - 1):
+                if c[i : i + 2] in lb:
+                    return True
+        return False
+
+    @staticmethod
+    def _ontology_field_label_matches_noun(
+        noun_phrase: str,
+        label_inner: str,
+    ) -> bool:
+        """
+        判断括号内业务名是否与名词相关。
+        须满足「核心词重叠」：去掉名词末尾泛化后缀（如「信息」「数据」）得到核心词，
+        核心词须整体或其二字片段出现在业务名中；禁止仅靠「信息」等与全名词二字窗口弱匹配。
+        整词包含（名词⊂业务名或反之）仍直接通过。
+        """
+        n = (noun_phrase or "").strip()
+        lb = (label_inner or "").strip()
+        if not n or not lb:
+            return False
+        if n in lb or lb in n:
+            return True
+        # 纯时间类名词避免弱匹配（防止与无关字段凑相似度）
+        if re.search(r"\d{4}", n) and ("年" in n or "月" in n or "Q" in n.upper()):
+            return False
+
+        core = IntentRouterTool._ontology_noun_core_stem(n)
+        if not core:
+            return False
+        if not IntentRouterTool._ontology_core_overlaps_label(core, lb):
+            return False
+        return True
+
+    async def _field_clarify_from_ontology_nouns(
+        self, query: str, noun_phrases: List[str]
+    ) -> List[Dict[str, Any]]:
+        """
+        由名词列表检索元数据候选字段，输出 field_clarify 条目。
+        流程：本体检索 → 用 _ontology_field_label_matches_noun 从 fields 括号业务名中筛选
+        → 相似度取 Top3 → 大模型判断是否确有歧义，有则生成消歧项。
+        """
+        out: List[Dict[str, Any]] = []
+        if not noun_phrases:
+            return out
+        adp_service = ADPService()
+        for noun_phrase in noun_phrases:
+            query_params = {
+                "condition": {
+                    "operation": "or",
+                    "sub_conditions": [
+                        {
+                            "field": "fields",
+                            "operation": "match",
+                            "value": noun_phrase,
+                        }
+                    ],
+                },
+                "need_total": True,
+                "limit": ONTOLOGY_FIELD_CLARIFY_MATCH_LIMIT,
+            }
+            try:
+                search_results = await adp_service.dip_ontology_query_by_object_types_external(
+                    self.token,
+                    kn_id=self.kn_id or "duty",
+                    class_id="metadata",
+                    body=query_params,
+                )
+                datas_page = search_results.get("datas") or []
+                total_hits = int(search_results.get("total_count", 0) or 0)
+                mat_fields_list: set[str] = set()
+                for data in datas_page:
+                    m_fields = data.get("fields", "")
+                    if not m_fields:
+                        continue
+                    for m in m_fields.split(","):
+                        if not m.strip():
+                            continue
+                        for m_res in re.findall(r"\((.*?)\)", m.strip()):
+                            if self._ontology_field_label_matches_noun(noun_phrase, m_res):
+                                mat_fields_list.add(m_res)
+                try:
+                    labels_for_log = json.dumps(
+                        sorted(mat_fields_list),
+                        ensure_ascii=False,
+                    )
+                except Exception:
+                    labels_for_log = str(sorted(mat_fields_list))
+                logger.info(
+                    "[IntentRouterTool] ontology field_clarify search_hits match_value=%r total_count=%s returned=%s core_filtered_label_count=%s core_filtered_labels=%s",
+                    noun_phrase,
+                    total_hits,
+                    len(datas_page),
+                    len(mat_fields_list),
+                    labels_for_log,
+                )
+                if mat_fields_list:
+                    score_fields_list: List[Tuple[str, float]] = []
+                    for m_field in mat_fields_list:
+                        score_fields_list.append(
+                            (m_field, levenshtein_similarity(m_field, noun_phrase))
+                        )
+                    score_fields_list.sort(key=lambda x: x[1], reverse=True)
+                    score_fields_list = score_fields_list[:3]
+                    top_labels = [sfm[0] for sfm in score_fields_list]
+                    if await self._llm_judge_field_ambiguity(query, noun_phrase, top_labels):
+                        opts = top_labels + ["其他"]
+                        out.append(
+                            {
+                                "field": noun_phrase,
+                                "question": f"你提到的「{noun_phrase}」更接近哪一个字段？",
+                                "options": opts,
+                                "chose_type": "单选",
+                            }
+                        )
+            except Exception as query_error:
+                logger.warning("[IntentRouterTool] ontology field_clarify failed: %s", query_error)
+        return out
+
+    async def _unified_field_clarify(self, query: str) -> Tuple[List[Dict[str, Any]], List[str]]:
+        """
+        统一字段消歧：规则词典 + LLM 名词抽取 + 本体检索，合并为同一输出结构。
+        在规则 need_clarify 回退、以及 LLM 裁决（无论 need_clarify 真假）之后调用。
+        """
+        lex = self._build_field_clarify(query)
+        noun_phrases = await self._llm_extract_nouns(query)
+        ontology = await self._field_clarify_from_ontology_nouns(query, noun_phrases)
+        merged = self._merge_field_clarify_lexicon_and_ontology(lex, ontology)
+        return merged, noun_phrases
 
     @staticmethod
     def _build_field_clarify(query: str) -> List[Dict[str, Any]]:
@@ -717,12 +1019,15 @@ class IntentRouterTool(LLMTool):
                                             "items": {"type": "object"},
                                             "description": "字段消歧信息",
                                         },
+                                        "field_need_clarify": {
+                                            "type": "boolean",
+                                            "description": "field_clarify 非空时为 true；此时 need_clarify 亦为 true",
+                                        },
                                         "noun_phrases": {
                                             "type": "array",
                                             "items": {"type": "string"},
                                             "description": "模糊意图时由LLM抽取的名词/名词短语",
-                                        }
-                                        ,
+                                        },
                                         "summary_text": {"type": "string", "description": "中文摘要文本"},
                                     },
                                 }
@@ -742,6 +1047,7 @@ class IntentRouterTool(LLMTool):
     ) -> Dict[str, Any]:
         """
         使用大模型在候选意图中做最终判别，并产出标准输出结构（含 need_clarify/反问/slots）。
+        字段/指标口径消歧由路由在裁决后统一处理（见 _unified_field_clarify），提示词要求模型固定输出 field_clarify=[]。
         失败时抛异常，由上层 fallback。
         """
         if not getattr(self, "llm", None):
@@ -1090,7 +1396,7 @@ class IntentRouterTool(LLMTool):
         except Exception:
             logger.info("intent_router module_result (rules): %s", module_result)
 
-        return {
+        out_rules: Dict[str, Any] = {
             "intent": "" if need_clarify else best_intent,
             "confidence": round(float(best_conf), 4),
             "slots": slots,
@@ -1102,20 +1408,17 @@ class IntentRouterTool(LLMTool):
             "clarify_questions": clarify_questions,
             # "intent_clarify": self._build_intent_clarify(candidates) if need_clarify else {},
             "refer_clarify": [],
-            "field_clarify": self._build_field_clarify(query) if enable_field_clarify else [],
-            "noun_phrases": [],
-            "summary_text": self._build_summary_text(
-                query=query,
-                intent=("" if need_clarify else best_intent),
-                confidence=float(best_conf),
-                slots=slots,
-                is_unknown=bool(is_unknown),
-                need_clarify=bool(need_clarify),
-                clarify_questions=clarify_questions,
-                intent_need_clarify=bool(need_clarify),
-                condition_need_clarify=False,
+            # 意图已由规则明确时不再附带规则字段消歧，避免与「直接返回」语义冲突
+            "field_clarify": (
+                self._build_field_clarify(query)
+                if (enable_field_clarify and need_clarify)
+                else []
             ),
+            "noun_phrases": [],
         }
+        self._sync_field_clarify_flags(out_rules)
+        self._refresh_router_summary(query, out_rules)
+        return out_rules
 
     def _route_embedding(
         self,
@@ -1180,6 +1483,8 @@ class IntentRouterTool(LLMTool):
         1. 如果向量匹配度非常高（>0.99），直接返回向量匹配结果，不使用LLM
         2. 如果规则匹配非常明确（置信度高且不需要澄清），直接返回规则结果，不使用LLM
         3. 如果出现模糊意图（need_clarify=True）且配置了LLM，自动使用LLM生成反问信息
+        4. enable_field_clarify 时：在「规则 need_clarify 回退」或「LLM 裁决完成」之后，
+           统一调用 _unified_field_clarify（词典 + 名词 + 本体检索 + 规则筛字段 + LLM 判歧义）。
         """
         if self._contains_sql_risk_tokens(query):
             review = await self._llm_sql_risk_review(query)
@@ -1188,13 +1493,14 @@ class IntentRouterTool(LLMTool):
                     query=query,
                     reason=str(review.get("reason", "") or "命中 SQL 高危操作，已拦截。"),
                 )
+        logger.info(f"query: {query}")
 
         # 1. 先尝试向量匹配
         embedding_res = self._route_embedding(
             query=query,
             intents=intents,
         )
-        
+        logger.info(f"embedding_res: {embedding_res}")
         # 如果向量匹配度非常高，直接返回结果
         if embedding_res and embedding_res.get("score", 0.0) > 0.99:
             slots = self._extract_slots(query)
@@ -1220,8 +1526,8 @@ class IntentRouterTool(LLMTool):
                 )
             except Exception:
                 logger.info("intent_router module_result (embedding): %s", module_result)
-            
-            return {
+
+            out_emb: Dict[str, Any] = {
                 "intent": embedding_res["intent"],
                 "confidence": round(embedding_res["score"], 4),
                 "slots": slots,
@@ -1235,18 +1541,10 @@ class IntentRouterTool(LLMTool):
                 "refer_clarify": [],
                 "field_clarify": [],
                 "noun_phrases": [],
-                "summary_text": self._build_summary_text(
-                    query=query,
-                    intent=embedding_res["intent"],
-                    confidence=float(embedding_res["score"]),
-                    slots=slots,
-                    is_unknown=False,
-                    need_clarify=False,
-                    clarify_questions=[],
-                    intent_need_clarify=False,
-                    condition_need_clarify=False,
-                ),
             }
+            self._sync_field_clarify_flags(out_emb)
+            self._refresh_router_summary(query, out_emb)
+            return out_emb
 
         # 2. 使用规则召回候选（以及规则 slots hint）
         rule_res = self._route_rules(
@@ -1256,7 +1554,8 @@ class IntentRouterTool(LLMTool):
             min_confidence=min_confidence,
             min_margin=min_margin,
             report_intents=report_intents,
-            enable_field_clarify=enable_field_clarify,
+            # 异步路径在裁决完成后统一做字段消歧，此处不在规则结果中预填 field_clarify
+            enable_field_clarify=False,
         )
 
         # _route_rules 不返回 module_result；这里单独生成 candidates 供 LLM 使用（仅日志，不返回）
@@ -1371,7 +1670,6 @@ class IntentRouterTool(LLMTool):
                 clarify_conditions = self._normalize_clarify_conditions(llm_out.get("clarify_conditions", []))
                 clarify_questions = llm_out.get("clarify_questions", []) or []
                 refer_clarify = self._normalize_refer_clarify(llm_out.get("refer_clarify"))
-                field_clarify = self._normalize_field_clarify(llm_out.get("field_clarify"))
                 if not isinstance(clarify_questions, list):
                     clarify_questions = [str(clarify_questions)]
                 clarify_questions = self._normalize_llm_clarify_questions(clarify_questions)
@@ -1401,69 +1699,12 @@ class IntentRouterTool(LLMTool):
                 if condition_need_clarify and not clarify_conditions:
                     clarify_conditions = self._infer_missing_conditions_from_slots(out_slots if isinstance(out_slots, dict) else slots_hint)
 
+                field_clarify: List[Dict[str, Any]] = []
                 noun_phrases: List[str] = []
-                if need_clarify:
-                    field_clarify = []
-                    if enable_field_clarify:
-                        noun_phrases = await self._llm_extract_nouns(query)
-                        adp_service = ADPService()
-                        for noun_phrase in noun_phrases:
-                            query_params = {
-                                "condition": {
-                                    "operation": "or",
-                                    "sub_conditions": [
-                                        {
-                                            "field": "fields",
-                                            "operation": "match",
-                                            "value": noun_phrase
-                                        }
-                                    ]
-                                },
-                                "need_total": True,
-                                "limit": 5
-                            }
-                            try:
+                if enable_field_clarify:
+                    field_clarify, noun_phrases = await self._unified_field_clarify(query)
 
-                                search_results = await adp_service.dip_ontology_query_by_object_types_external(
-                                    self.token,
-                                    kn_id=self.kn_id or "duty",
-                                    class_id="metadata",
-                                    body=query_params
-                                )
-
-                                logger.info(
-                                    f"[IntentRouterTool] search success, total_count={search_results.get('total_count', 0)}")
-                                mat_fields_list = set()
-                                for data in search_results.get("datas", []):
-                                    if data.get("fields", ""):
-                                        m_fields = data.get("fields", "")
-
-                                        for m in m_fields.split(","):
-                                            if m.strip():
-                                                result = re.findall(r'\((.*?)\)', m.strip())
-                                                for m_res in result:
-                                                    if noun_phrase in m_res:
-                                                        mat_fields_list.add(m_res)
-                                if len(mat_fields_list):
-                                    score_fields_list = []
-                                    for m_field in mat_fields_list:
-                                        score = levenshtein_similarity(m_field, noun_phrase)
-                                        score_fields_list.append((m_field, score))
-                                    score_fields_list.sort(key=lambda x: x[1], reverse=True)
-                                    score_fields_list = score_fields_list[:3]
-                                    logger.info("{} score_fields_list {}".format(noun_phrase, score_fields_list))
-                                    field_clarify.append({
-                                        "可能歧义字段": noun_phrase,
-                                        "可选项": [sfm[0] for sfm in score_fields_list] + ["其他"]
-                                    })
-                            except Exception as query_error:
-                                logger.warning(
-                                    f"[IntentRouterTool] failed: {query_error}, but continue")
-
-                if not enable_field_clarify:
-                    field_clarify = []
-
-                return {
+                out_llm: Dict[str, Any] = {
                     "intent": "" if intent_need_clarify else intent,
                     "confidence": round(max(0.0, min(1.0, confidence)), 4),
                     "slots": {
@@ -1482,23 +1723,10 @@ class IntentRouterTool(LLMTool):
                     "refer_clarify": refer_clarify,
                     "field_clarify": field_clarify,
                     "noun_phrases": noun_phrases,
-                    "summary_text": self._build_summary_text(
-                        query=query,
-                        intent=("" if intent_need_clarify else intent),
-                        confidence=float(max(0.0, min(1.0, confidence))),
-                        slots={
-                            "数据对象": str(out_slots.get("数据对象", "")) if isinstance(out_slots, dict) else "",
-                            "时间范围": str(out_slots.get("时间范围", "")) if isinstance(out_slots, dict) else "",
-                            "维度": str(out_slots.get("维度", "")) if isinstance(out_slots, dict) else "",
-                            "操作条件": str(out_slots.get("操作条件", "")) if isinstance(out_slots, dict) else "",
-                        },
-                        is_unknown=bool(is_unknown),
-                        need_clarify=bool(need_clarify),
-                        clarify_questions=clarify_questions,
-                        intent_need_clarify=bool(intent_need_clarify),
-                        condition_need_clarify=bool(condition_need_clarify),
-                    ),
                 }
+                self._sync_field_clarify_flags(out_llm)
+                self._refresh_router_summary(query, out_llm)
+                return out_llm
             except Exception as e:
                 logger.warning(f"intent_router llm choose failed, fallback to rules: {e}")
                 # LLM失败时，返回规则结果（包含规则生成的澄清问题）
@@ -1527,7 +1755,7 @@ class IntentRouterTool(LLMTool):
         if "refer_clarify" not in rule_res:
             rule_res["refer_clarify"] = []
         if "field_clarify" not in rule_res:
-            rule_res["field_clarify"] = self._build_field_clarify(query) if enable_field_clarify else []
+            rule_res["field_clarify"] = []
         if "intent_need_clarify" not in rule_res:
             rule_res["intent_need_clarify"] = bool(rule_res.get("need_clarify", False))
         if "condition_need_clarify" not in rule_res:
@@ -1538,6 +1766,12 @@ class IntentRouterTool(LLMTool):
             # rule_res["intent_clarify"] = self._build_intent_clarify(candidates) if bool(rule_res.get("need_clarify", False)) else {}
         if "noun_phrases" not in rule_res:
             rule_res["noun_phrases"] = []
+        if enable_field_clarify and bool(rule_res.get("need_clarify", False)):
+            fc, np = await self._unified_field_clarify(query)
+            rule_res["field_clarify"] = fc
+            rule_res["noun_phrases"] = np
+        self._sync_field_clarify_flags(rule_res)
+        self._refresh_router_summary(query, rule_res)
         return rule_res
 
 

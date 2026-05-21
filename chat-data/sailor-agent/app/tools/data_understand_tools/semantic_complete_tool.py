@@ -26,6 +26,7 @@ from app.tools.base import (
     async_construct_final_answer
 )
 from config import get_settings
+from app.utils.llm_config import build_data_understand_llm_dict
 from app.logs.logger import logger
 from .prompts.semantic_complete_prompt import SemanticCompletePrompt
 from config import settings
@@ -702,21 +703,7 @@ class SemanticCompleteTool(LLMTool):
             params: dict
     ):
         """将工具转换为异步 API 类方法"""
-        llm_dict = {
-            "model_name": settings.TOOL_LLM_MODEL_NAME,
-            "openai_api_key": settings.TOOL_LLM_OPENAI_API_KEY,
-            "openai_api_base": settings.TOOL_LLM_OPENAI_API_BASE,
-            "max_tokens": 20000
-        }
-        llm_out_dict = params.get("llm", {})
-        if llm_out_dict.get("name"):
-            llm_dict["model_name"] = llm_out_dict.get("name")
-        if llm_out_dict.get("max_tokens"):
-            llm_dict["max_tokens"] = llm_out_dict.get("max_tokens")
-        else:
-            llm_dict["max_tokens"] = 20000
-        llm_dict["temperature"] = 0
-
+        llm_dict = build_data_understand_llm_dict(params)
         logger.info("llm dict: {}".format(llm_dict))
         llm = CustomChatOpenAI(**llm_dict)
 
@@ -770,14 +757,7 @@ class SemanticCompleteTool(LLMTool):
             params: dict
     ):
         """将工具转换为异步 API 类方法，直接接受视图数据"""
-        llm_dict = {
-            "model_name": settings.TOOL_LLM_MODEL_NAME,
-            "openai_api_key": settings.TOOL_LLM_OPENAI_API_KEY,
-            "openai_api_base": settings.TOOL_LLM_OPENAI_API_BASE,
-            "max_tokens": 20000
-        }
-        llm_dict.update(params.get("llm", {}))
-
+        llm_dict = build_data_understand_llm_dict(params)
         logger.info("llm dict: {}".format(llm_dict))
         llm = CustomChatOpenAI(**llm_dict)
 
@@ -794,6 +774,7 @@ class SemanticCompleteTool(LLMTool):
             background=config_dict.get("background", ""),
             session=session,
             with_sample=config_dict.get("with_sample", False),
+            model_type=llm_dict["model_name"],
         )
 
         query = params.get("query", "")

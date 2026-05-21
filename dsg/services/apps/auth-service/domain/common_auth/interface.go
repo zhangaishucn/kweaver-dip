@@ -36,11 +36,10 @@ type AuthManagement interface {
 type Enforcer interface {
 	Enforce(ctx context.Context, reqs dto.PolicyEnforceReq) ([]bool, error)
 	CurrentUserEnforce(ctx context.Context, req *dto.CurrentUserEnforce) (bool, error)
-	CurrentUserBatchEnforce(ctx context.Context, req *dto.CurrentUserBatchEnforce) ([]bool, error)
+	CurrentUserBatchEnforce(ctx context.Context, req *dto.CurrentUserBatchEnforce) ([]*dto.ObjectAuthResultItem, error)
 	GetObjectsBySubjectId(ctx context.Context, req *dto.GetObjectsBySubjectIdReq) (res *dto.GetObjectsBySubjectIdRes, err error)
 	QueryPolicyExpiredObjects(ctx context.Context, req *dto.QueryPolicyExpiredObjectsArgs) ([]string, error)
 	CheckUserPermission(ctx context.Context, req *dto.RulePolicyEnforce) (*dto.RulePolicyEnforceEffect, error)
 	MenuResourceEnforce(ctx context.Context, r *dto.MenuResourceEnforceArg) (policyEnforceEffect *dto.MenuResourceEnforceEffect, err error)
 	MenuResourceActions(ctx context.Context, req *dto.MenuResourceActionsArg) (resp *dto.MenuResourceActionsResp, err error)
-	ListSubViews(ctx context.Context, request *dto.ListSubViewsReq) (*dto.ListSubViewsRes, error)
 }

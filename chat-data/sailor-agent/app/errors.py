@@ -8,12 +8,12 @@ class ErrorCode:
     Text2MetricError = "Text2MetricError"
     Text2DIPMetricError = "Text2DIPMetricError"
     Json2PlotError = "Json2PlotError"
+    ForecastingToolError = "ForecastingToolError"
     ResultParseError = "ResultParseError"
     SDKRequestError = "SDKRequestError"
     OpenSearchRequestError = 'OpenSearchRequestError'
     PythonCodeError = 'PythonCodeError'
     ToolFatalError = 'ToolFatalError'
-    SandboxError = 'SandboxError'
     SQLHelperError = 'SQLHelperError'
     KnowledgeItemError = 'KnowledgeItemError'
 
@@ -187,20 +187,22 @@ class Json2PlotError(AgentBaseError):
         )
 
 
+class ForecastingToolError(AgentBaseError):
+    """smart-forecasting 工具链（走势预测草稿 / 结构化输出）错误。"""
+
+    def __init__(self, detail: Any, status: int = 500, reason: str = ""):
+        super().__init__(
+            code=ErrorCode.ForecastingToolError,
+            status=status,
+            reason=reason,
+            detail=detail,
+        )
+
+
 class PythonCodeError(AgentBaseError):
     def __init__(self, detail: Any, status: int = 500, reason: str = ""):
         super().__init__(
             code=ErrorCode.PythonCodeError,
-            status=status,
-            reason=reason,
-            detail=detail
-        )
-
-
-class SandboxError(AgentBaseError):
-    def __init__(self, detail: Any, status: int = 500, reason: str = ""):
-        super().__init__(
-            code=ErrorCode.SandboxError,
             status=status,
             reason=reason,
             detail=detail

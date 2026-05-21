@@ -1,0 +1,28 @@
+name: sailor-service-build
+
+on:
+  push:
+    paths:
+      - "chat-data/sailor-service/**"
+      - ".github/workflows/sailor-service-build.yml"
+      - ".github/workflows/reusable-build-service.yml"
+      - "VERSION"
+  workflow_dispatch:
+    inputs:
+      push_latest:
+        description: "Whether to also publish the latest tag"
+        required: false
+        default: "false"
+
+jobs:
+  build:
+    uses: ./.github/workflows/reusable-build-service.yml
+    with:
+      service_name: sailor-service
+      image_name: af/sailor-service
+      chart_dir: chat-data/sailor-service/helm/sailor-service
+      dockerfile: chat-data/sailor-service/docker/Dockerfile
+      # Dockerfile COPY paths (cmd/server/config/static, etc.) are relative to this directory.
+      build_context: chat-data/sailor-service
+      push_latest: ${{ inputs.push_latest || 'false' }}
+    secrets: inherit

@@ -512,9 +512,30 @@ type CurrentUserEnforce struct {
 	Action     string `json:"action" form:"action" binding:"required"`                            //检查的操作，逗号分割的字符串                                                                                           //请求动作 view 查看 read 读取 download 下载
 }
 
+type SimpleObjectObject struct {
+	ObjectId   string `json:"object_id" form:"object_id" binding:"required"`     //资源id
+	ObjectType string `json:"object_type" form:"object_type" binding:"required"` //资源类型
+	// SourceObjectID 可选；用于批量鉴权结果按来源对象分组（如子视图所属的逻辑视图）
+	SourceObjectID string `json:"source_object_id" form:"source_object_id" binding:"omitempty"`
+}
+
+// SourceObjectGroupKey 与同名字段语义一致的对象分组键：无来源时使用资源自身 ID
+func (s *SimpleObjectObject) SourceObjectGroupKey() string {
+	if s.SourceObjectID != "" {
+		return s.SourceObjectID
+	}
+	return s.ObjectId
+}
+
+type SimpleSubject struct {
+	SubjectType string `json:"subject_type" form:"subject_type" binding:"required,oneof=app user department role"` //访问者类型 app 应用 user 用户 department 部门 role 角色
+	SubjectId   string `json:"subject_id" form:"subject_id" binding:"required"`                                    //访问者id
+}
+
 type CurrentUserBatchEnforce struct {
-	Resouces []Object `json:"resouces" form:"resouces" binding:"required"`                                             //资源列表
-	Action   []string `json:"action" form:"action" binding:"required,dive,oneof=data_query view_detail modify delete"` //检查的操作，逗号分割的字符串                                                                                           //请求动作 view 查看 read 读取 download 下载
+	Subject   *SimpleSubject       `json:"subject" form:"subject" binding:"omitempty"`    //访问者
+	Resources []SimpleObjectObject `json:"resources" form:"resources" binding:"required"` //资源列表UserID
+	Action    []string             `json:"action" form:"action" binding:"required,min=1"` //检查的操作，逗号分割的字符串                                                                                           //请求动作 view 查看 read 读取 download 下载
 }
 
 func (c *CurrentUserBatchEnforce) HasAllAction(actions []string) bool {
@@ -522,10 +543,10 @@ func (c *CurrentUserBatchEnforce) HasAllAction(actions []string) bool {
 }
 
 func (c *CurrentUserBatchEnforce) ResourceObjects() []authorization.ResourceObject {
-	return lo.Times(len(c.Resouces), func(index int) authorization.ResourceObject {
+	return lo.Times(len(c.Resources), func(index int) authorization.ResourceObject {
 		return authorization.ResourceObject{
-			ID:   c.Resouces[index].ObjectId,
-			Type: c.Resouces[index].ObjectType,
+			ID:   c.Resources[index].ObjectId,
+			Type: c.Resources[index].ObjectType,
 		}
 	})
 }
@@ -578,4 +599,9 @@ func ObjectToResourceType(object string) string {
 
 func ResourceTypeToObject(resourceType string) string {
 	return resourceTypeToObject[resourceType]
+}
+
+type ObjectAuthResultItem struct {
+	ObjectId string `json:"object_id"`
+	Effect   bool   `json:"effect"` // true 表示允许，false 表示拒绝
 }

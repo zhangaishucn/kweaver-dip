@@ -36,6 +36,5 @@ func InitApp(s *settings.Settings) (*AppRunner, func(), error) {
 		infrastructure.Set,
 		newApp,
 		appRunnerSet,
-		settings.Set,
 	))
 }

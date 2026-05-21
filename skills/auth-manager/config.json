@@ -1,0 +1,45 @@
+{
+  "name": "auth-manager",
+  "version": "1.3.4",
+  "openclaw": {
+    "skillKey": "auth-manager"
+  },
+  "description": "数据权限管理：意图识别后，按查询或申请分支执行资源/申请人发现、申请前预检与 auth-service 接口调用。",
+  "defaults": {
+    "progress_template": "## 📋 任务进度清单（阶段：{flow}）\n- [ ] 待完成 · 步骤{step}（{name}）\n- [ ] 待完成 · 下一步（{next}）"
+  },
+  "pipeline": [
+    {
+      "step": 1,
+      "role": "intent_routing",
+      "flow": "auth-manager",
+      "required": true
+    },
+    {
+      "step": 2,
+      "role": "param_validation",
+      "flow": "auth-manager",
+      "required": true
+    },
+    {
+      "step": 3,
+      "role": "dispatch_branch",
+      "flow": "auth-manager",
+      "required": true
+    },
+    {
+      "step": 4,
+      "role": "auth_query",
+      "flow": "auth-query",
+      "trigger": "intent=query_permission",
+      "reference": "skills/auth-manager/references/auth-query.md"
+    },
+    {
+      "step": 4,
+      "role": "auth_apply",
+      "flow": "auth-apply",
+      "trigger": "intent=apply_permission",
+      "reference": "skills/auth-manager/references/auth-apply.md"
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+name: sailor-agent-build
+
+on:
+  push:
+    paths:
+      - "chat-data/sailor-agent/**"
+      - ".github/workflows/sailor-agent-build.yml"
+      - ".github/workflows/reusable-build-service.yml"
+      - "VERSION"
+  workflow_dispatch:
+    inputs:
+      push_latest:
+        description: "Whether to also publish the latest tag"
+        required: false
+        default: "false"
+
+jobs:
+  build:
+    uses: ./.github/workflows/reusable-build-service.yml
+    with:
+      service_name: sailor-agent
+      image_name: af/sailor-agent
+      chart_dir: chat-data/sailor-agent/helm/sailor-agent
+      dockerfile: chat-data/sailor-agent/docker/Dockerfile
+      build_context: chat-data/sailor-agent
+      push_latest: ${{ inputs.push_latest || 'false' }}
+    secrets: inherit

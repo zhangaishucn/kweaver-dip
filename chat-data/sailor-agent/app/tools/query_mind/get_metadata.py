@@ -12,7 +12,7 @@ from app.tools.base import AFTool
 from app.errors import ToolFatalError
 from app.tools.base import api_tool_decorator, validate_openapi_schema
 
-from app.datasource.dip_metric import DIPMetric
+from app.datasource.bkn_native_metric import BKNNativeMetricDataSource
 from app.datasource.dip_dataview import DataView
 from app.api.agent_retrieval import (
     get_datasource_from_agent_retrieval_async,
@@ -49,7 +49,7 @@ class GetMetadataTool(AFTool):
     session: Optional[BaseChatHistorySession] = None
 
     data_source: Optional[DataView] = None
-    dip_metric: Optional[DIPMetric] = None
+    dip_metric: Optional[BKNNativeMetricDataSource] = None
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -246,6 +246,9 @@ class GetMetadataTool(AFTool):
                 else:
                     logger.warning(f"metric_list 格式不正确: {direct_metric_list}")
 
+            resolved_kn_id = (data_source_dict.get("kn_id") or "").strip()
+            last_kn_id = ""
+
             # 从知识网络 (kn) 中获取数据源
             if kn_params:
                 try:
@@ -257,6 +260,7 @@ class GetMetadataTool(AFTool):
 
                         if not kn_id:
                             continue
+                        last_kn_id = str(kn_id).strip()
 
                         # 获取查询语句，如果没有则使用默认值
                         query = params.get('query', params.get('input', '所有数据'))
@@ -291,6 +295,9 @@ class GetMetadataTool(AFTool):
                     logger.error(f"从知识网络获取数据源失败: {e}")
                     logger.error(traceback.format_exc())
 
+            if not resolved_kn_id:
+                resolved_kn_id = last_kn_id
+
             # 创建数据源实例
             data_source = None
             if view_list:
@@ -305,12 +312,15 @@ class GetMetadataTool(AFTool):
 
             dip_metric = None
             if metric_list:
-                dip_metric = DIPMetric(
+                dip_metric = BKNNativeMetricDataSource(
+                    kn_id=resolved_kn_id,
                     metric_list=metric_list,
                     token=token,
                     user_id=user_id,
-                    base_url=base_url,
-                    account_type=account_type
+                    account_type=account_type,
+                    bkn_backend_base=(data_source_dict.get("bkn_backend_base") or "").strip(),
+                    ontology_query_base=(data_source_dict.get("ontology_query_base") or "").strip(),
+                    branch=(data_source_dict.get("branch") or "main").strip() or "main",
                 )
 
             # 创建工具实例

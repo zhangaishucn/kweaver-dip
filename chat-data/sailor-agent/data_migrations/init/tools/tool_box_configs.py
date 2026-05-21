@@ -3,7 +3,10 @@ from pathlib import Path
 
 from config import settings
 
-API_BASE_URL = "http://agent-operator-integration:9000/api/agent-operator-integration/internal-v1"
+API_BASE_URL = (
+    f"http://{settings.AGENT_OPERATOR_INTEGRATION_HOST}:"
+    f"{settings.AGENT_OPERATOR_PORT}/api/agent-operator-integration/internal-v1"
+)
 
 openapi_file_path = Path(__file__).parent / "openai"
 

@@ -2887,292 +2887,225 @@
             "name": "stream",
             "in": "query",
             "description": "是否流式返回",
-            "required": false,
             "schema": {
-              "default": false,
-              "type": "boolean"
-            }
+              "type": "boolean",
+              "default": false
+            },
+            "required": false
           },
           {
             "name": "mode",
             "in": "query",
             "description": "请求模式",
-            "required": false,
             "schema": {
-              "default": "http",
+              "type": "string",
               "enum": [
                 "http",
                 "sse"
               ],
-              "type": "string"
-            }
+              "default": "http"
+            },
+            "required": false
           }
         ],
         "requestBody": {
-          "required": false,
           "content": {
             "application/json": {
               "schema": {
+                "type": "object",
                 "properties": {
-                  "action": {
-                    "default": "query",
-                    "description": "操作类型：show_ds 显示数据源信息，query 执行查询（默认）",
-                    "enum": [
-                      "show_ds",
-                      "query"
-                    ],
-                    "type": "string"
-                  },
-                  "config": {
-                    "description": "工具配置参数",
-                    "properties": {
-                      "background": {
-                        "description": "背景信息",
-                        "type": "string"
-                      },
-                      "dimension_num_limit": {
-                        "default": 30,
-                        "description": "给大模型选择时维度数量限制，-1表示不限制, 系统默认为 30",
-                        "type": "integer"
-                      },
-                      "force_limit": {
-                        "default": 1000,
-                        "description": "查询指标时，如果没有设置返回数据条数限制，在采用该参数设置的值作为限制, -1表示不限制, 系统默认为 1000",
-                        "type": "integer"
-                      },
-                      "recall_top_k": {
-                        "default": 5,
-                        "description": "指标召回数量限制，用于限制从数据源中召回的指标数量，-1表示不限制, 系统默认为 5",
-                        "type": "integer"
-                      },
-                      "return_data_limit": {
-                        "default": 5000,
-                        "description": "结果返回时数据总量限制，单位是字节，-1表示不限制, 原因是指标查询执行后返回大量数据，可能导致大模型上下文token超限。系统默认为 5000",
-                        "type": "integer"
-                      },
-                      "return_record_limit": {
-                        "default": 100,
-                        "description": "结果返回时数据条数限制，-1表示不限制, 原因是指标查询执行后返回大量数据，可能导致大模型上下文token超限。系统默认为 100",
-                        "type": "integer"
-                      },
-                      "session_id": {
-                        "description": "会话ID",
-                        "type": "string"
-                      },
-                      "session_type": {
-                        "default": "redis",
-                        "description": "会话类型",
-                        "enum": [
-                          "in_memory",
-                          "redis"
-                        ],
-                        "type": "string"
-                      }
-                    },
-                    "type": "object"
-                  },
                   "data_source": {
-                    "description": "数据源配置信息",
+                    "type": "object",
+                    "description": "数据源配置信息；bkn-backend / ontology-query 根地址与 BKN 分支由服务端 config（ADP_ONTOLOGY_MANAGER_HOST、ADP_ONTOLOGY_QUERY_HOST 等）决定，请求体不覆盖",
                     "properties": {
+                      "metric_list": {
+                        "type": "array",
+                        "description": "候选指标 ID 列表，供模型从中选择；可为空，此时须设置 specified_metric_id 指定唯一指标",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "token": {
+                        "type": "string",
+                        "description": "认证令牌"
+                      },
+                      "user_id": {
+                        "type": "string",
+                        "description": "用户ID"
+                      },
                       "account_type": {
-                        "default": "user",
+                        "type": "string",
                         "description": "调用者的类型，user 代表普通用户，app 代表应用账号，anonymous 代表匿名用户",
                         "enum": [
                           "user",
                           "app",
                           "anonymous"
                         ],
-                        "type": "string"
-                      },
-                      "base_url": {
-                        "description": "服务器地址",
-                        "type": "string"
+                        "default": "user"
                       },
                       "kn": {
-                        "description": "知识网络配置参数",
+                        "type": "array",
+                        "description": "知识网络配置；未填 data_source.kn_id 时，取本数组最后一项的 knowledge_network_id 作为 kn_id（不发起指标检索）",
                         "items": {
+                          "type": "object",
                           "properties": {
                             "knowledge_network_id": {
-                              "description": "知识网络ID",
-                              "type": "string"
+                              "type": "string",
+                              "description": "知识网络ID"
                             },
                             "object_types": {
+                              "type": "array",
                               "description": "知识网络对象类型",
                               "items": {
                                 "type": "string"
-                              },
-                              "type": "array"
+                              }
                             }
                           },
                           "required": [
                             "knowledge_network_id"
-                          ],
-                          "type": "object"
-                        },
-                        "type": "array"
+                          ]
+                        }
                       },
-                      "metric_list": {
-                        "description": "指标ID列表",
-                        "items": {
-                          "type": "string"
-                        },
-                        "type": "array"
+                      "kn_id": {
+                        "type": "string",
+                        "description": "业务知识网络 ID（bkn-backend / ontology-query 路径参数）；与 kn 数组可同时存在，未填时取 kn 最后一项"
                       },
-                      "recall_mode": {
-                        "default": "keyword_vector_retrieval",
-                        "description": "召回模式，支持 keyword_vector_retrieval(默认), agent_intent_planning, agent_intent_retrieval",
-                        "enum": [
-                          "keyword_vector_retrieval",
-                          "agent_intent_planning",
-                          "agent_intent_retrieval"
-                        ],
-                        "type": "string"
-                      },
-                      "search_scope": {
-                        "description": "知识网络搜索范围，支持 object_types, relation_types, action_types",
-                        "items": {
-                          "type": "string"
-                        },
-                        "type": "array"
-                      },
-                      "token": {
-                        "description": "认证令牌",
-                        "type": "string"
-                      },
-                      "user_id": {
-                        "description": "用户ID",
-                        "type": "string"
+                      "specified_metric_id": {
+                        "type": "string",
+                        "description": "用户指定的 BKN 指标 id；设置后跳过指标选择，仅由 LLM 生成 query_params 并执行查询。"
                       }
-                    },
-                    "type": "object"
-                  },
-                  "infos": {
-                    "description": "额外的输入信息, 包含额外信息和知识增强信息",
-                    "properties": {
-                      "extra_info": {
-                        "description": "额外信息(非知识增强)",
-                        "type": "string"
-                      },
-                      "knowledge_enhanced_information": {
-                        "description": "知识增强信息",
-                        "type": "object"
-                      }
-                    },
-                    "type": "object"
+                    }
                   },
                   "inner_llm": {
-                    "description": "内部语言模型配置，用于指定内部使用的 LLM 模型参数，如模型ID、名称、温度、最大token数等。支持通过模型工厂配置模型",
-                    "type": "object"
+                    "type": "object",
+                    "description": "内部语言模型配置，用于指定内部使用的 LLM 模型参数，如模型ID、名称、温度、最大token数等。支持通过模型工厂配置模型"
+                  },
+                  "infos": {
+                    "type": "object",
+                    "description": "额外的输入信息（可选 extra_info）",
+                    "properties": {
+                      "extra_info": {
+                        "type": "string",
+                        "description": "额外信息（拼入 LLM 背景）"
+                      }
+                    }
                   },
                   "input": {
-                    "description": "用户输入的自然语言查询",
-                    "type": "string"
+                    "type": "string",
+                    "description": "用户输入的自然语言查询"
                   },
-                  "llm": {
-                    "description": "外部大语言模型配置，一般不需要配置，除非需要使用外部模型",
-                    "properties": {
-                      "max_tokens": {
-                        "description": "最大生成令牌数",
-                        "type": "integer"
-                      },
-                      "model_name": {
-                        "description": "模型名称",
-                        "type": "string"
-                      },
-                      "openai_api_base": {
-                        "description": "OpenAI API基础URL",
-                        "type": "string"
-                      },
-                      "openai_api_key": {
-                        "description": "OpenAI API密钥",
-                        "type": "string"
-                      },
-                      "temperature": {
-                        "description": "生成温度参数",
-                        "type": "number"
-                      }
-                    },
-                    "type": "object"
+                  "session_type": {
+                    "type": "string",
+                    "description": "会话存储：redis（默认）或 in_memory（无 Redis 环境冒烟时使用）",
+                    "enum": [
+                      "redis",
+                      "in_memory"
+                    ],
+                    "default": "redis"
+                  },
+                  "action": {
+                    "type": "string",
+                    "description": "操作类型：query 执行指标查询（默认）",
+                    "enum": [
+                      "query"
+                    ],
+                    "default": "query"
                   },
                   "timeout": {
-                    "default": 120,
+                    "type": "number",
                     "description": "请求超时时间（秒），超过此时间未完成则返回超时错误，默认120秒",
-                    "type": "number"
+                    "default": 120
                   }
                 },
                 "required": [
                   "data_source",
                   "input"
-                ],
-                "type": "object"
+                ]
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
             "description": "Successful operation",
             "content": {
               "application/json": {
-                "example": {
-                  "output": {
-                    "cites": [
-                      {
-                        "description": "CPU使用率指标",
-                        "id": "cpu_usage_metric",
-                        "name": "CPU使用率",
-                        "type": "metric"
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string",
+                      "description": "查询标题"
+                    },
+                    "data": {
+                      "type": "array",
+                      "description": "查询结果数据",
+                      "items": {
+                        "type": "object"
                       }
-                    ],
-                    "data": [
-                      {
-                        "CPU使用率": 75.5,
-                        "主机": "server-1",
-                        "时间": "2024-01-01 10:00:00"
-                      },
-                      {
-                        "CPU使用率": 78.2,
-                        "主机": "server-1",
-                        "时间": "2024-01-01 10:01:00"
-                      }
-                    ],
+                    },
                     "data_desc": {
-                      "real_records_num": 120,
-                      "return_records_num": 2
+                      "type": "object",
+                      "description": "数据描述信息",
+                      "properties": {
+                        "return_records_num": {
+                          "type": "integer",
+                          "description": "返回记录数"
+                        },
+                        "real_records_num": {
+                          "type": "integer",
+                          "description": "实际记录数"
+                        }
+                      }
+                    },
+                    "metric_id": {
+                      "type": "string",
+                      "description": "选择的指标ID，基于用户输入自动匹配并选择的指标标识符"
+                    },
+                    "query_params": {
+                      "type": "object",
+                      "description": "生成的查询参数，包含时间范围、过滤条件、步长等指标查询所需的参数"
+                    },
+                    "explanation": {
+                      "type": "object",
+                      "description": "查询解释说明，以字典形式展示指标选择、时间范围、过滤条件等信息的业务含义"
+                    },
+                    "cites": {
+                      "type": "array",
+                      "description": "引用的指标列表，包含指标ID、名称、类型等信息",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "result_cache_key": {
+                      "type": "string",
+                      "description": "结果缓存键，用于从缓存中获取完整查询结果，前端可通过此键获取完整数据"
                     },
                     "execution_result": {
-                      "data_summary": {
-                        "is_calendar": false,
-                        "is_variable": false,
-                        "step": "1m",
-                        "total_data_points": 120
-                      },
-                      "model_info": {
-                        "id": "cpu_usage_metric",
-                        "metric_type": "atomic",
-                        "name": "CPU使用率",
-                        "query_type": "dsl",
-                        "unit": "%"
-                      },
-                      "sample_data": [
+                      "type": "object",
+                      "description": "指标执行结果详情，包含指标元信息、数据摘要、样例数据等"
+                    }
+                  }
+                },
+                "example": {
+                  "output": {
+                    "metric_id": "cpu_usage_metric",
+                    "query_params": {
+                      "instant": false,
+                      "start": 1646360670123,
+                      "end": 1646471470123,
+                      "step": "1m",
+                      "filters": [
                         {
-                          "index": 1,
-                          "labels": {
-                            "host": "server-1"
-                          },
-                          "sample_times": [
-                            1646360670123,
-                            1646360730123
+                          "name": "labels.host",
+                          "value": [
+                            "server-1",
+                            "server-2"
                           ],
-                          "sample_values": [
-                            75.5,
-                            78.2
-                          ],
-                          "time_points": 120,
-                          "value_points": 120
+                          "operation": "in"
                         }
-                      ],
-                      "success": true
+                      ]
                     },
                     "explanation": {
                       "CPU使用率": [
@@ -3187,84 +3120,89 @@
                         }
                       ]
                     },
-                    "metric_id": "cpu_usage_metric",
-                    "query_params": {
-                      "end": 1646471470123,
-                      "filters": [
+                    "cites": [
+                      {
+                        "id": "cpu_usage_metric",
+                        "name": "CPU使用率",
+                        "type": "metric",
+                        "description": "CPU使用率指标"
+                      }
+                    ],
+                    "data": [
+                      {
+                        "时间": "2024-01-01 10:00:00",
+                        "主机": "server-1",
+                        "CPU使用率": 75.5
+                      },
+                      {
+                        "时间": "2024-01-01 10:01:00",
+                        "主机": "server-1",
+                        "CPU使用率": 78.2
+                      }
+                    ],
+                    "title": "最近1小时CPU使用率",
+                    "data_desc": {
+                      "return_records_num": 2,
+                      "real_records_num": 120
+                    },
+                    "execution_result": {
+                      "success": true,
+                      "model_info": {
+                        "id": "cpu_usage_metric",
+                        "name": "CPU使用率",
+                        "metric_type": "atomic",
+                        "query_type": "dsl",
+                        "unit": "%"
+                      },
+                      "data_summary": {
+                        "total_data_points": 120,
+                        "step": "1m",
+                        "is_variable": false,
+                        "is_calendar": false
+                      },
+                      "sample_data": [
                         {
-                          "name": "labels.host",
-                          "operation": "in",
-                          "value": [
-                            "server-1",
-                            "server-2"
+                          "index": 1,
+                          "labels": {
+                            "host": "server-1"
+                          },
+                          "time_points": 120,
+                          "value_points": 120,
+                          "sample_times": [
+                            1646360670123,
+                            1646360730123
+                          ],
+                          "sample_values": [
+                            75.5,
+                            78.2
                           ]
                         }
-                      ],
-                      "instant": false,
-                      "start": 1646360670123,
-                      "step": "1m"
+                      ]
                     },
-                    "result_cache_key": "cpu_usage_metric_1646360670123_1646471470123",
-                    "title": "最近1小时CPU使用率"
+                    "result_cache_key": "cpu_usage_metric_1646360670123_1646471470123"
                   },
                   "time": "2.5",
                   "tokens": "150"
-                },
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/af-sailor-agent/v1/assistant/tools/text2metric/schema": {
+      "get": {
+        "tags": [
+          "tools"
+        ],
+        "summary": "get_text2metric_schema",
+        "description": "返回与 POST 工具文档同构的 JSON 片段（与运行时 GET 行为一致）",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
                 "schema": {
-                  "properties": {
-                    "cites": {
-                      "description": "引用的指标列表，包含指标ID、名称、类型等信息",
-                      "items": {
-                        "type": "object"
-                      },
-                      "type": "array"
-                    },
-                    "data": {
-                      "description": "查询结果数据",
-                      "items": {
-                        "type": "object"
-                      },
-                      "type": "array"
-                    },
-                    "data_desc": {
-                      "description": "数据描述信息",
-                      "properties": {
-                        "real_records_num": {
-                          "description": "实际记录数",
-                          "type": "integer"
-                        },
-                        "return_records_num": {
-                          "description": "返回记录数",
-                          "type": "integer"
-                        }
-                      },
-                      "type": "object"
-                    },
-                    "execution_result": {
-                      "description": "指标执行结果详情，包含指标元信息、数据摘要、样例数据等",
-                      "type": "object"
-                    },
-                    "explanation": {
-                      "description": "查询解释说明，以字典形式展示指标选择、时间范围、过滤条件等信息的业务含义",
-                      "type": "object"
-                    },
-                    "metric_id": {
-                      "description": "选择的指标ID，基于用户输入自动匹配并选择的指标标识符",
-                      "type": "string"
-                    },
-                    "query_params": {
-                      "description": "生成的查询参数，包含时间范围、过滤条件、步长等指标查询所需的参数",
-                      "type": "object"
-                    },
-                    "result_cache_key": {
-                      "description": "结果缓存键，用于从缓存中获取完整查询结果，前端可通过此键获取完整数据",
-                      "type": "string"
-                    },
-                    "title": {
-                      "description": "查询标题",
-                      "type": "string"
-                    }
-                  },
                   "type": "object"
                 }
               }

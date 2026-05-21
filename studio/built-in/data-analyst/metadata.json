@@ -1,7 +1,7 @@
 {
     "type": "digital-human",
     "id": "__data_analyst__",
-    "name": "数据分析员",
+    "name": "AI数据分析员",
     "description": "专业的数据分析数字员工",
     "is_builtin": true
 }

@@ -17,7 +17,6 @@ import (
 	"github.com/kweaver-ai/idrm-go-frame/core/telemetry/log"
 	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/adapter/driven/database"
 	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/adapter/driven/database/af_configuration"
-	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/adapter/driven/gorm"
 	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/dto"
 	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/enum"
 	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/util"
@@ -26,6 +25,8 @@ import (
 	"github.com/samber/lo"
 	"go.uber.org/zap"
 )
+
+const adminUserID = "266c6a42-6131-4d62-8f39-853e7093701c"
 
 type auth struct {
 	driven authorization.Driven
@@ -36,7 +37,6 @@ type auth struct {
 func NewAuth(
 	driven authorization.Driven,
 	redisClient *redis.Client,
-	subIndicatorRepo gorm.IndicatorDimensionalRuleInterface,
 	ccDriven configuration_center.Driven,
 	apiDriven data_application_service.Driven,
 	dataViewDriven data_view.Driven,
@@ -48,7 +48,6 @@ func NewAuth(
 		driven: driven,
 		helper: NewAuthHelper(
 			redisClient,
-			subIndicatorRepo,
 			ccDriven,
 			apiDriven,
 			dataViewDriven,
@@ -118,16 +117,46 @@ func (a *auth) CurrentUserEnforce(ctx context.Context, req *dto.CurrentUserEnfor
 }
 
 // CurrentUserBatchEnforce 当前用户的批量策略验证
-func (a *auth) CurrentUserBatchEnforce(ctx context.Context, req *dto.CurrentUserBatchEnforce) ([]bool, error) {
+func (a *auth) CurrentUserBatchEnforce(ctx context.Context, req *dto.CurrentUserBatchEnforce) ([]*dto.ObjectAuthResultItem, error) {
 	userInfo, err := gutil.GetUserInfo(ctx)
 	if err != nil {
 		return nil, err
 	}
+	subject := req.Subject
+	if subject == nil {
+		subject = &dto.SimpleSubject{
+			SubjectType: authorization.ACCESSOR_TYPE_USER,
+			SubjectId:   userInfo.ID,
+		}
+	}
+	// 如果是admin用户，则直接授权
+	if subject.SubjectId == adminUserID {
+		return lo.Times(len(req.Resources), func(index int) *dto.ObjectAuthResultItem {
+			return &dto.ObjectAuthResultItem{
+				ObjectId: req.Resources[index].ObjectId,
+				Effect:   true,
+			}
+		}), nil
+	}
+	//查询subject是否是是内部角色
+	hasInnerRole, err := a.driven.HasRoles(ctx, subject.SubjectId, authorization.InnerBusinessRoles...)
+	if err != nil {
+		return nil, err
+	}
+	//内部角色默认有全部的权限
+	if hasInnerRole {
+		return lo.Times(len(req.Resources), func(index int) *dto.ObjectAuthResultItem {
+			return &dto.ObjectAuthResultItem{
+				ObjectId: req.Resources[index].ObjectId,
+				Effect:   true,
+			}
+		}), nil
+	}
 	arg := &authorization.ResourceFilterArgs{
 		AllowOperation: true,
 		Accessor: authorization.Accessor{
-			ID:   userInfo.ID,
-			Type: dto.SubjectUser.String(),
+			ID:   subject.SubjectId,
+			Type: subject.SubjectType,
 		},
 		Resources: req.ResourceObjects(),
 		Operation: req.Action,
@@ -139,15 +168,23 @@ func (a *auth) CurrentUserBatchEnforce(ctx context.Context, req *dto.CurrentUser
 		log.Errorf("CheckUserPermission Error %v", err.Error())
 		return nil, err
 	}
-	results := make([]bool, 0, len(req.Resouces))
+	grouped := make([]*dto.ObjectAuthResultItem, 0)
 	for index, r := range result {
-		if r.Id == req.Resouces[index].ObjectId && req.HasAllAction(result[index].AllowOperation) {
-			results = append(results, true)
+		var item *dto.ObjectAuthResultItem
+		if r.Id == req.Resources[index].ObjectId && req.HasAllAction(result[index].AllowOperation) {
+			item = &dto.ObjectAuthResultItem{
+				ObjectId: req.Resources[index].ObjectId,
+				Effect:   true,
+			}
 		} else {
-			results = append(results, false)
+			item = &dto.ObjectAuthResultItem{
+				ObjectId: req.Resources[index].ObjectId,
+				Effect:   false,
+			}
 		}
+		grouped = append(grouped, item)
 	}
-	return results, nil
+	return grouped, nil
 }
 
 // GetObjectsBySubjectId 查询用户的所有权限配置
@@ -248,11 +285,6 @@ func (a *auth) CheckUserPermission(ctx context.Context, req *dto.RulePolicyEnfor
 		Action:     req.Action,
 		Effect:     effect,
 	}, nil
-}
-
-// ListSubViews 获取用户拥有任意一个指定权限的行列规则（子视图）列表
-func (a *auth) ListSubViews(ctx context.Context, request *dto.ListSubViewsReq) (*dto.ListSubViewsRes, error) {
-	return nil, nil
 }
 
 // MenuResourceEnforce 对功能鉴权, 菜单功能鉴权，主体只能是人

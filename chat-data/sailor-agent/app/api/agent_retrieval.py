@@ -1,4 +1,5 @@
 from urllib.parse import urljoin
+from typing import List, Optional
 
 import urllib3
 import traceback
@@ -41,10 +42,18 @@ class AgentRetrievalService:
                 self.base_url,
                 "/api/agent-retrieval/v1/kn/semantic-search"
             )
+            self.search_schema_url = urljoin(
+                self.base_url,
+                "/api/agent-retrieval/v1/kn/search_schema",
+            )
         else:
             self.semantic_search_url = urljoin(
                 self.base_url,
                 "/api/agent-retrieval/in/v1/kn/semantic-search"
+            )
+            self.search_schema_url = urljoin(
+                self.base_url,
+                "/api/agent-retrieval/in/v1/kn/search_schema",
             )
 
     def semantic_search(self, params: dict = {}, headers: dict = {}) -> dict:
@@ -78,6 +87,101 @@ class AgentRetrievalService:
             return result
         except AfDataSourceError as e:
             raise AgentRetrievalError(e) from e
+
+    def search_schema(self, params: dict = {}, headers: dict = None) -> dict:
+        """context-loader 统一 Schema 探索（含 metric_types），契约见 adp context-loader search_schema.yaml"""
+        if headers is None:
+            headers = {}
+        headers = {**headers}
+        headers.update(self.headers)
+        api = API(
+            url=self.search_schema_url,
+            headers=headers,
+            method=HTTPMethod.POST,
+            payload=params,
+        )
+        try:
+            return api.call()
+        except AfDataSourceError as e:
+            raise AgentRetrievalError(e) from e
+
+    async def search_schema_async(self, params: dict = {}, headers: dict = None) -> dict:
+        if headers is None:
+            headers = {}
+        headers = {**headers}
+        headers.update(self.headers)
+        api = API(
+            url=self.search_schema_url,
+            headers=headers,
+            method=HTTPMethod.POST,
+            payload=params,
+        )
+        try:
+            return await api.call_async()
+        except AfDataSourceError as e:
+            raise AgentRetrievalError(e) from e
+
+
+def metric_ids_from_search_schema_response(body: dict) -> List[str]:
+    """解析 search_schema 响应中的 metric_types，保持返回顺序。"""
+    if not isinstance(body, dict):
+        return []
+    out: List[str] = []
+    for item in body.get("metric_types") or []:
+        if not isinstance(item, dict):
+            continue
+        mid = item.get("id") or item.get("metric_id")
+        if mid:
+            out.append(str(mid))
+    return out
+
+
+async def recall_metric_ids_via_search_schema_async(
+    kn_id: str,
+    query: str,
+    headers: dict,
+    base_url: str = "",
+    max_concepts: int = 10,
+    concept_groups: Optional[List[str]] = None,
+) -> List[str]:
+    """
+    基于用户问题调用 context-loader `search_schema`，仅在 search_scope 中开启 metric_types。
+    参考：adp/context-loader/agent-retrieval/docs/apis/api_private/search_schema.yaml
+    """
+    kn_id = (kn_id or "").strip()
+    query = (query or "").strip()
+    if not kn_id or not query:
+        return []
+
+    search_scope: dict = {
+        "include_object_types": False,
+        "include_relation_types": False,
+        "include_action_types": False,
+        "include_metric_types": True,
+    }
+    if concept_groups:
+        search_scope["concept_groups"] = concept_groups
+
+    params = {
+        "kn_id": kn_id,
+        "query": query,
+        "max_concepts": max(1, max_concepts),
+        "search_scope": search_scope,
+        "schema_brief": False,
+        "enable_rerank": True,
+    }
+
+    try:
+        service = AgentRetrievalService(base_url=base_url, headers=headers)
+        result = await service.search_schema_async(params=params, headers=dict(headers))
+        return metric_ids_from_search_schema_response(result)
+    except AgentRetrievalError as e:
+        logger.warning(f"search_schema 召回指标失败，将回退为全量指标列表: {e}")
+        return []
+    except Exception as e:
+        logger.warning(f"search_schema 召回指标异常，将回退为全量指标列表: {e}")
+        traceback.print_exc()
+        return []
 
 
 async def get_datasource_from_agent_retrieval_async(

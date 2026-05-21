@@ -46,8 +46,9 @@ async def validation_exception_handler(request: Request,
     )
 
 
-# 初始化内置工具箱, 如果失败会进行重试
-init_built_in_agent_and_tool()
+# 初始化内置工具箱, 如果失败会进行重试（DEBUG_MODE 为 True 时跳过）
+if not settings.DEBUG_MODE:
+    init_built_in_agent_and_tool()
 
 if __name__ == '__main__':
     import uvicorn

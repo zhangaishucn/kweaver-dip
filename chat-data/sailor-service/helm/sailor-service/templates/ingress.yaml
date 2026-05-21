@@ -18,3 +18,10 @@ spec:
               number: {{.Values.service.port}}
         path: {{.Values.apiPathPrefix}}
         pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: {{.Values.name}}
+            port:
+              number: {{.Values.service.port}}
+        path: /api/af-sailor-service
+        pathType: ImplementationSpecific

@@ -216,7 +216,7 @@ func (s *Controller) Enforce(c *gin.Context) {
 //	@Accept			json
 //	@Produce		json
 //	@Param			_	body		dto.CurrentUserBatchEnforce	true	"请求参数"
-//	@Success		200	{object}	[]bool	"成功响应参数"
+//	@Success		200	{object}	[]dto.SourceObjectAuthResultGroup	"成功响应参数（按 source_object_id 分组）"
 //	@Failure		400	{object}	rest.HttpError			"失败响应参数"
 //	@Router			/api/auth-service/v1/enforce [post]
 func (s *Controller) UserOperationBatchCheck(c *gin.Context) {
@@ -350,49 +350,6 @@ func (s *Controller) RuleEnforce(c *gin.Context) {
 	}
 
 	res, err := s.authDomain.CheckUserPermission(c.Request.Context(), req)
-	if err != nil {
-		c.Writer.WriteHeader(http.StatusBadRequest)
-		ginx.ResErrJson(c, err)
-		return
-	}
-
-	ginx.ResOKJson(c, res)
-}
-
-// ListSubViews 获取用户拥有权限的子视图（行列规则）列表
-//
-//	@Description	获取用户拥有权限的子视图（行列规则）列表
-//	@Summary		获取用户拥有权限的子视图（行列规则）列表
-//	@Accept			json
-//	@Produce		json
-//	@Param			_	query		dto.ListSubViewsReq	true	"请求参数"
-//	@Success		200	{object}	dto.ListSubViewsRes	"成功响应参数"
-//	@Failure		400	{object}	rest.HttpError		"失败响应参数"
-//	@Router			/api/auth-service/v1/sub-views [get]
-func (s *Controller) ListSubViews(c *gin.Context) {
-	req := &dto.ListSubViewsReq{}
-
-	_, err := form_validator.BindQueryAndValid(c, req)
-	if err != nil {
-		c.Writer.WriteHeader(http.StatusBadRequest)
-		if errors.As(err, &form_validator.ValidErrors{}) {
-			ginx.ResErrJson(c, errorcode.Detail(errorcode.PublicInvalidParameter, err))
-			return
-		}
-
-		ginx.ResErrJson(c, errorcode.Desc(errorcode.PublicRequestParameterError))
-		return
-	}
-
-	// 补全参数
-	completeListSubViewsReq(c, req)
-	// 参数校验
-	if err = validateListSubViewsReq(req); err != nil {
-		ginx.ResErrJsonWithCode(c, http.StatusBadRequest, errorcode.Detail(errorcode.PublicRequestParameterError, err))
-		return
-	}
-
-	res, err := s.authDomain.ListSubViews(c.Request.Context(), req)
 	if err != nil {
 		c.Writer.WriteHeader(http.StatusBadRequest)
 		ginx.ResErrJson(c, err)

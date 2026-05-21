@@ -5,7 +5,10 @@ node_modules/
 __pycache__/
 *.pyc
 
+# macOS Finder metadata（勿提交；若曾入库请 `git rm --cached`）
 .DS_Store
+**/.DS_Store
 .vscode/
 .env
 .tmp/
+.cursor/

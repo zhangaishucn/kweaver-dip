@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -16,7 +15,6 @@ import (
 	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/errorcode"
 	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/util"
 	"github.com/samber/lo"
-	"go.uber.org/zap"
 )
 
 const (
@@ -82,9 +80,6 @@ func (d *AuthHelper) getObjectInfoFromDB(ctx context.Context, objectType, object
 
 	case enum.ObjectTypeIndicator:
 		objectInfo, err = d.GetIndicatorInfo(ctx, objectId) // 指标
-	case enum.ObjectTypeIndicatorDimensionalRule:
-		objectInfo, err = d.GetSubIndicatorInfo(ctx, objectId) // 指标维度规则
-
 	default:
 		objectInfo = &dto.Object{}
 	}
@@ -238,46 +233,6 @@ func (d *AuthHelper) GetSubViewInfo(ctx context.Context, objectID string) (*dto.
 	//父级和顶级一样，授权范围就是顶级的类型
 	if objectInfo.AuthScopeID == objectInfo.SourceObjectID {
 		objectInfo.AuthScopeType = string(dto.ObjectDataView)
-	}
-	return objectInfo, nil
-}
-
-func (d *AuthHelper) GetSubIndicatorInfo(ctx context.Context, objectID string) (*dto.Object, error) {
-	// 从数据库查询指标维度规则
-	log.Debug("get indicator dimensional rule", zap.Any("id", objectID))
-	rule, err := d.subIndicatorRepo.Get(ctx, objectID)
-	if errors.Is(err, gorm.ErrNotFound) {
-		return nil, errorcode.Desc(errorcode.ObjectIdNotExist)
-	} else if err != nil {
-		return nil, err
-	}
-
-	// 从数据库查询规则所属的指标
-	log.Debug("get indicator the indicator dimensional rule belongs to", zap.Any("indicatorID", rule.Spec.IndicatorID))
-	indicator, err := d.indicatorDriven.GetIndicator(ctx, strconv.Itoa(rule.Spec.IndicatorID))
-	if errors.Is(err, gorm.ErrNotFound) {
-		return nil, errorcode.Desc(errorcode.ObjectIdNotExist)
-	} else if err != nil {
-		return nil, err
-	}
-	objectInfo := &dto.Object{
-		ObjectId:       objectID,
-		ObjectType:     dto.ObjectSubIndicator.Str(),
-		ObjectName:     rule.Spec.Name,
-		DepartmentID:   indicator.Department.Id,
-		AuthScopeID:    fmt.Sprintf("%v", rule.Spec.AuthScopeID),
-		SourceObjectID: fmt.Sprintf("%v", rule.Spec.IndicatorID),
-		AuthScopeType:  dto.ObjectSubIndicator.Str(),
-		Owners: lo.Times(len(indicator.Owners), func(index int) dto.ObjectOwner {
-			return dto.ObjectOwner{
-				OwnerID:   indicator.Owners[index].OwnerID,
-				OwnerName: indicator.Owners[index].OwnerName,
-			}
-		}),
-	}
-	//父级和顶级一样，授权范围就是顶级的类型
-	if objectInfo.AuthScopeID == objectInfo.SourceObjectID {
-		objectInfo.AuthScopeType = string(dto.ObjectIndicator)
 	}
 	return objectInfo, nil
 }

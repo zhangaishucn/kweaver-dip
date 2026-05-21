@@ -4,6 +4,7 @@ import json
 from collections.abc import Iterable, Sequence
 from functools import lru_cache
 from math import sqrt
+from typing import Any, cast
 
 import jieba
 from sqlalchemy import Select, case, func, or_, select
@@ -20,6 +21,7 @@ from app.memory.models import (
     MemoryListResultDTO,
     MemoryQueryDTO,
     MemorySearchResultDTO,
+    MemorySourceType,
     MemoryStatusDTO,
 )
 
@@ -41,6 +43,33 @@ class MemoryRepository:
         使用项目默认停用词集合过滤检索 token。
         """
         return get_default_stop_words()
+
+    def get_document_by_id(self, doc_id: str) -> MemoryDocumentDTO | None:
+        record = self._session.get(MemoryDocumentRecord, doc_id)
+        if record is None:
+            return None
+        metadata: dict[str, Any] = {}
+        if record.extra_metadata:
+            try:
+                metadata = json.loads(record.extra_metadata)
+            except json.JSONDecodeError:
+                metadata = {}
+        st_raw = record.source_type or "business_rule"
+        if st_raw not in ("business_rule", "profile"):
+            st_raw = "business_rule"
+        return MemoryDocumentDTO(
+            id=record.id,
+            user_id=record.user_id,
+            source_type=cast(MemorySourceType, st_raw),
+            text=record.text,
+            title=record.title,
+            location=record.location,
+            metadata=metadata,
+            created_at=record.created_at,
+            updated_at=record.updated_at,
+            datasource_id=record.datasource_id,
+            segmented_text=record.segmented_text,
+        )
 
     def upsert_documents(self, docs: Iterable[MemoryDocumentDTO]) -> None:
         for doc in docs:

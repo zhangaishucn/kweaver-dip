@@ -31,6 +31,12 @@ class InMemoryChatSession(BaseChatHistorySession):
         self.message_history_session = {}
         self.agent_logs = {}
 
+    def add_working_context(self, session_id: str, working_context: dict):
+        pass
+
+    def get_working_context(self, session_id: str) -> dict:
+        return {}
+
     def add_agent_logs(
             self,
             session_id: str,

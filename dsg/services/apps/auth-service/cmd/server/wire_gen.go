@@ -13,26 +13,27 @@ import (
 	"github.com/kweaver-ai/idrm-go-common/rest/auth-service/v1"
 	impl3 "github.com/kweaver-ai/idrm-go-common/rest/authorization/impl"
 	impl9 "github.com/kweaver-ai/idrm-go-common/rest/automation/impl"
+	impl10 "github.com/kweaver-ai/idrm-go-common/rest/bkn_backend/impl"
 	impl2 "github.com/kweaver-ai/idrm-go-common/rest/configuration_center/impl"
+	impl13 "github.com/kweaver-ai/idrm-go-common/rest/dip_studio/impl"
 	impl4 "github.com/kweaver-ai/idrm-go-common/rest/data_application_service/impl"
 	impl8 "github.com/kweaver-ai/idrm-go-common/rest/data_model/impl"
 	impl5 "github.com/kweaver-ai/idrm-go-common/rest/data_view/impl"
 	"github.com/kweaver-ai/idrm-go-common/rest/hydra/impl"
 	impl6 "github.com/kweaver-ai/idrm-go-common/rest/indicator_management/impl"
-	impl11 "github.com/kweaver-ai/idrm-go-common/rest/studio_web/impl"
+	impl12 "github.com/kweaver-ai/idrm-go-common/rest/studio_web/impl"
 	"github.com/kweaver-ai/idrm-go-common/rest/user_management"
 	"github.com/kweaver-ai/idrm-go-common/trace"
 	"github.com/kweaver-ai/idrm-go-frame"
 	"github.com/kweaver-ai/idrm-go-frame/core/transport/rest"
 	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/adapter/driven/database"
-	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/adapter/driven/gorm"
 	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/adapter/driven/resources"
 	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/adapter/driver"
 	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/adapter/driver/v2/auth"
 	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/adapter/driver/v2/data_auth"
 	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/common/settings"
 	impl7 "github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/domain/common_auth/impl"
-	impl10 "github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/domain/data_auth/impl"
+	impl11 "github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/domain/data_auth/impl"
 	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/infrastructure/repository/db"
 	"github.com/kweaver-ai/kweaver-dip/dsg/services/apps/auth-service/infrastructure/repository/redis"
 )
@@ -52,11 +53,6 @@ func InitApp(s *settings.Settings) (*AppRunner, func(), error) {
 	}
 	middleware := v1_2.NewMiddleware(hydra, drivenUserMgnt, driven, logger, authorizationDriven, authServiceInternalV1Interface)
 	redisClient := redis.NewRedisClient()
-	gormDB, err := db.NewMariaDB(s)
-	if err != nil {
-		return nil, nil, err
-	}
-	indicatorDimensionalRuleInterface := gorm.NewIndicatorDimensionalRuleInterfaceRepository(gormDB)
 	data_application_serviceDriven := impl4.NewDrivenImpl(client)
 	data_viewDriven := impl5.NewDataViewDriven(client)
 	indicator_managementDriven := impl6.NewDrivenImpl(client)
@@ -65,11 +61,13 @@ func InitApp(s *settings.Settings) (*AppRunner, func(), error) {
 		return nil, nil, err
 	}
 	databaseClient := database.New(gormDBWithoutDatabase)
-	common_authAuth := impl7.NewAuth(authorizationDriven, redisClient, indicatorDimensionalRuleInterface, driven, data_application_serviceDriven, data_viewDriven, indicator_managementDriven, databaseClient, drivenUserMgnt)
+	common_authAuth := impl7.NewAuth(authorizationDriven, redisClient, driven, data_application_serviceDriven, data_viewDriven, indicator_managementDriven, databaseClient, drivenUserMgnt)
 	controller := auth.NewController(common_authAuth)
 	data_modelDriven := impl8.NewDrivenImpl(client)
 	automationDriven := impl9.NewDriven(client)
-	useCase := impl10.NewDataAuth(data_modelDriven, automationDriven)
+	bkn_backendDriven := impl10.NewDriven(client)
+	dip_studioDriven := impl13.NewDriven(client)
+	useCase := impl11.NewDataAuth(data_modelDriven, automationDriven, bkn_backendDriven, authorizationDriven, dip_studioDriven)
 	data_authController := data_auth.NewController(useCase)
 	router := &driver.Router{
 		Middleware:       middleware,
@@ -78,7 +76,7 @@ func InitApp(s *settings.Settings) (*AppRunner, func(), error) {
 	}
 	server := driver.NewHttpServer(s, router)
 	app := newApp(server)
-	studio_webDriven := impl11.NewDriven(client)
+	studio_webDriven := impl12.NewDriven(client)
 	registerClient := resources.NewRegisterClient(authorizationDriven, studio_webDriven)
 	appRunner := &AppRunner{
 		App:              app,
